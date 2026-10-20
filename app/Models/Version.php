@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models;
 
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Modules\Core\Contracts\IHidesAttributesFromAnonymous;
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Enums\VersionChangeType;
@@ -19,9 +22,13 @@ use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
 use Override;
-use Overtrue\LaravelVersionable\Version as OvertrueVersion;
 
-final class Version extends OvertrueVersion
+/**
+ * One row of the history of a versioned record.
+ *
+ * Parts absorbed from overtrue/laravel-versionable, MIT License, Copyright (c) 2019 overtrue.
+ */
+final class Version extends Model
 {
     use HasFactory;
 
@@ -44,6 +51,18 @@ final class Version extends OvertrueVersion
     protected $table = CoreTables::Versions->value;
 
     /**
+     * @var list<string>
+     */
+    #[Override]
+    protected $guarded = [];
+
+    /**
+     * @var list<string>
+     */
+    #[Override]
+    protected $with = ['versionable'];
+
+    /**
      * @var array<int,string>
      *
      * @psalm-suppress NonInvariantPropertyType
@@ -62,8 +81,7 @@ final class Version extends OvertrueVersion
      *
      * @psalm-suppress MoreSpecificReturnType
      */
-    #[Override]
-    public static function createForModel(Model $model, array $replacements = [], mixed $time = null, ?VersionStrategy $strategyUsed = null): self
+    public static function createForModel(Model $model, array $replacements = [], DateTimeInterface|string|null $time = null, ?VersionStrategy $strategyUsed = null): self
     {
         return resolve(VersionWriterInterface::class)->write(VersionChange::forModel(
             model: $model,
@@ -71,6 +89,49 @@ final class Version extends OvertrueVersion
             time: $time,
             strategy: $strategyUsed,
         ));
+    }
+
+    /**
+     * @return MorphTo<Model, $this>
+     */
+    public function versionable(): MorphTo
+    {
+        return $this->morphTo('versionable');
+    }
+
+    #[Override]
+    public function getIncrementing(): bool
+    {
+        return config('versionable.uuid') ? false : parent::getIncrementing();
+    }
+
+    #[Override]
+    public function getKeyType(): string
+    {
+        return config('versionable.uuid') ? 'string' : parent::getKeyType();
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeOrderOldestFirst(Builder $query): Builder
+    {
+        return $query->oldest()->oldest('id');
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeOrderLatestFirst(Builder $query): Builder
+    {
+        return $query->latest()->latest('id');
+    }
+
+    public function revert(): bool
+    {
+        return (bool) $this->revertWithoutSaving()?->save();
     }
 
     /**
@@ -113,7 +174,6 @@ final class Version extends OvertrueVersion
         return VersionStrategy::DIFF;
     }
 
-    #[Override]
     public function revertWithoutSaving(): ?Model
     {
         $versionable = $this->getCompleteVersionable();
@@ -127,7 +187,7 @@ final class Version extends OvertrueVersion
         switch ($this->resolveReplayVersionStrategy($versionable)) {
             case VersionStrategy::DIFF:
                 // v1 + ... + vN
-                /** @var OvertrueVersion $version */
+                /** @var self $version */
                 foreach ($this->previousVersions()->orderOldestFirst()->get() as $version) {
                     if ($version->contents !== []) {
                         $versionable->setRawAttributes(array_merge($original, $version->contents));
@@ -137,7 +197,7 @@ final class Version extends OvertrueVersion
                 break;
             case VersionStrategy::SNAPSHOT:
                 // v1 + vN
-                /** @var OvertrueVersion $initVersion */
+                /** @var self $initVersion */
                 $initVersion = $versionable->versions()->first();
 
                 if ($initVersion->contents !== []) {
@@ -157,7 +217,6 @@ final class Version extends OvertrueVersion
      *
      * @return MorphMany<Version>
      */
-    #[Override]
     public function previousVersions(): MorphMany
     {
         $versionable = $this->getCompleteVersionable();
@@ -172,7 +231,6 @@ final class Version extends OvertrueVersion
             });
     }
 
-    #[Override]
     public function nextVersion(): ?static
     {
         $versionable = $this->getCompleteVersionable();
@@ -223,6 +281,16 @@ final class Version extends OvertrueVersion
         }
 
         return $serialized;
+    }
+
+    #[Override]
+    protected static function booted(): void
+    {
+        self::creating(static function (self $version): void {
+            if (config('versionable.uuid')) {
+                $version->{$version->getKeyName()} = $version->{$version->getKeyName()} ?: (string) Str::orderedUuid();
+            }
+        });
     }
 
     /**

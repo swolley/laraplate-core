@@ -20,13 +20,13 @@ use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Locking\Exceptions\LockedModelException;
+use Modules\Core\Models\Version;
 use Modules\Core\Services\PerModelSettingResolver;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
-use Overtrue\LaravelVersionable\Version;
 use Overtrue\LaravelVersionable\Versionable;
 
 // use Illuminate\Database\Eloquent\Relations\Pivot;

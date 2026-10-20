@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 /**
- * The versioning library was absorbed into Core (D14). This guards against a new reference to it.
+ * The versioning library was absorbed into Core (D14). This guards against a new reference to it. A symbol
+ * matches only as a whole name: the library's `Version` is not its `Versionable`.
  */
 it('leaves no reference to the absorbed versioning library', function (string $symbol): void {
     $root = dirname(__DIR__, 5);
@@ -19,7 +20,7 @@ it('leaves no reference to the absorbed versioning library', function (string $s
             continue;
         }
 
-        if (str_contains((string) file_get_contents($path), $symbol)) {
+        if (preg_match('/' . preg_quote($symbol, '/') . '(?![A-Za-z0-9_])/', (string) file_get_contents($path)) === 1) {
             $offenders[] = str_replace($root . DIRECTORY_SEPARATOR, '', $path);
         }
     }
@@ -29,4 +30,5 @@ it('leaves no reference to the absorbed versioning library', function (string $s
     expect($offenders)->toBe([]);
 })->with([
     'strategy enum' => ['Overtrue\LaravelVersionable\VersionStrategy'],
+    'version model' => ['Overtrue\LaravelVersionable\Version'],
 ]);

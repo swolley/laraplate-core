@@ -370,3 +370,8 @@ it('toArray keeps in the contents the storage columns of dynamic contents, which
         'presettable_id' => 4,
     ]);
 });
+
+it('is a plain Core model without soft deletes', function (): void {
+    expect(get_parent_class(Version::class))->toBe(Illuminate\Database\Eloquent\Model::class)
+        ->and(class_uses_recursive(Version::class))->not->toContain(Illuminate\Database\Eloquent\SoftDeletes::class);
+});

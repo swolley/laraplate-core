@@ -586,11 +586,11 @@ it('rolls back when an extra version row has no confirmed sequence', function ()
         ->and($manager->current())->toBeNull();
 });
 
-it('counts a soft deleted extra row as an unconfirmed persisted sequence', function (): void {
+it('leaves nothing of an extra row deleted before finish, since versions have no bin', function (): void {
     $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
     $manager = app(VersionSetManagerInterface::class);
 
-    expect(fn () => $manager->run(
+    $manager->run(
         VersionSetRoot::forModel($article),
         function (ActiveVersionSet $active) use ($article): void {
             $article->updateOrFail(['title' => 'After']);
@@ -610,15 +610,15 @@ it('counts a soft deleted extra row as an unconfirmed persisted sequence', funct
             ])->saveOrFail();
             $version->deleteOrFail();
         },
-    ))->toThrow(VersionSequenceMismatchException::class);
+    );
 
-    expect($article->fresh()->title)->toBe('Before')
-        ->and(VersionSet::query()->count())->toBe(0)
-        ->and(Version::withTrashed()->whereNotNull('version_set_id')->count())->toBe(0)
+    expect($article->fresh()->title)->toBe('After')
+        ->and(VersionSet::query()->count())->toBe(1)
+        ->and(Version::query()->whereNotNull('version_set_id')->pluck('sequence')->all())->toBe([1])
         ->and($manager->current())->toBeNull();
 });
 
-it('rolls back when a confirmed version row is soft deleted before finish', function (): void {
+it('rolls back when a confirmed version row is deleted before finish', function (): void {
     $article = VersionSetManagerArticle::query()->create(['title' => 'Before']);
     $manager = app(VersionSetManagerInterface::class);
 
@@ -632,7 +632,7 @@ it('rolls back when a confirmed version row is soft deleted before finish', func
 
     expect($article->fresh()->title)->toBe('Before')
         ->and(VersionSet::query()->count())->toBe(0)
-        ->and(Version::withTrashed()->whereNotNull('version_set_id')->count())->toBe(0)
+        ->and(Version::query()->whereNotNull('version_set_id')->count())->toBe(0)
         ->and($manager->current())->toBeNull();
 });
 
