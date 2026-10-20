@@ -7,6 +7,8 @@ namespace Modules\Core\Providers;
 use Illuminate\Auth\Events\Attempting;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Events\TransactionCommitted;
+use Illuminate\Database\Events\TransactionRolledBack;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Cache;
@@ -21,6 +23,7 @@ use Modules\Core\Models\Modification;
 use Modules\Core\Models\Pivot\Fieldable;
 use Modules\Core\Models\Preset;
 use Modules\Core\Services\DynamicContentsService;
+use Modules\Core\Support\OwnerTimestamp;
 use Override;
 
 final class EventServiceProvider extends ServiceProvider
@@ -76,6 +79,18 @@ final class EventServiceProvider extends ServiceProvider
         Event::subscribe(LockedModelSubscriber::class);
 
         Event::listen('eloquent.deleted: *', [RemoveOriginOfDeletedRecord::class, 'handle']);
+
+        // Only an instance that touched something has state to keep in step with the transactions.
+        Event::listen(TransactionCommitted::class, function (TransactionCommitted $event): void {
+            if ($this->app->resolved(OwnerTimestamp::class)) {
+                $this->app->make(OwnerTimestamp::class)->committed($event->connection);
+            }
+        });
+        Event::listen(TransactionRolledBack::class, function (TransactionRolledBack $event): void {
+            if ($this->app->resolved(OwnerTimestamp::class)) {
+                $this->app->make(OwnerTimestamp::class)->rolledBack($event->connection);
+            }
+        });
 
         Event::listen('eloquent.saved: ' . Modification::class, function (Modification $modification): void {
             if (! $modification->active || ! $modification->wasRecentlyCreated) {

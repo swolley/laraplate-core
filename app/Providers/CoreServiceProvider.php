@@ -120,6 +120,7 @@ use Modules\Core\Services\SettingChangeConfirmations;
 use Modules\Core\Services\SettingsCacheCoordinator;
 use Modules\Core\Services\StubOutboxPublisher;
 use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Support\OwnerTimestamp;
 use Modules\Core\Versioning\ActiveVersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
@@ -234,6 +235,9 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         // The content locale a reader picked (the backoffice), for this request or job only.
         $this->app->scoped(ContentLocale::class);
+
+        // Remembers the owners touched in the open transactions of this request or job only.
+        $this->app->scoped(OwnerTimestamp::class);
 
         // Carries the password from Attempting to Login within one request, and never past it.
         $this->app->scoped(LogoutOtherDevicesListener::class);
