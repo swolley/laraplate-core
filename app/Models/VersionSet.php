@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Enums\VersionCaptureQuality;
 use Modules\Core\Enums\VersionSetKind;
 use Override;
 
@@ -36,6 +37,7 @@ final class VersionSet extends Model
         'root_connection_ref',
         'root_table_ref',
         'kind',
+        'capture',
         'reason',
         'reverted_from_set_id',
     ];
@@ -75,6 +77,7 @@ final class VersionSet extends Model
     {
         return [
             'kind' => VersionSetKind::class,
+            'capture' => VersionCaptureQuality::class,
             'created_at' => 'immutable_datetime',
         ];
     }

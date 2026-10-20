@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Enums\VersionCaptureQuality;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Helpers\MigrateUtils;
 
@@ -17,9 +18,8 @@ return new class() extends Migration
     public function up(): void
     {
         $table_name = CoreTables::VersionSets->value;
-        $uses_oracle = Schema::getConnection()->getDriverName() === 'oracle';
 
-        Schema::create($table_name, static function (Blueprint $table) use ($table_name, $uses_oracle): void {
+        Schema::create($table_name, static function (Blueprint $table) use ($table_name): void {
             $table->id();
             $table->uuid('uuid');
             $table->string('root_type')->nullable();
@@ -31,6 +31,10 @@ return new class() extends Migration
                 'kind',
                 array_map(static fn (VersionSetKind $case): string => $case->value, VersionSetKind::cases()),
             );
+            $table->enum(
+                'capture',
+                array_map(static fn (VersionCaptureQuality $case): string => $case->value, VersionCaptureQuality::cases()),
+            )->default(VersionCaptureQuality::BestEffort->value)->comment('Capture quality of the set (D47, D52)');
             $table->string('reason', 255)->nullable();
             $table->unsignedBigInteger('reverted_from_set_id')->nullable();
 
@@ -45,14 +49,11 @@ return new class() extends Migration
             $table->index(['root_type', 'root_id'], 'vsets_root_IDX');
             MigrateUtils::prefixIndex($table, 'user_id');
             MigrateUtils::prefixIndex($table, 'reverted_from_set_id');
-            $reverted_from_foreign_key = $table->foreign('reverted_from_set_id', 'vsets_reverted_FK')
+            // A revert whose target was purged or compacted keeps a null link (D58); Oracle supports SET NULL.
+            $table->foreign('reverted_from_set_id', 'vsets_reverted_FK')
                 ->references('id')
-                ->on($table_name);
-
-            // Oracle's default NO ACTION is restrictive; its DDL rejects ON DELETE RESTRICT.
-            if (! $uses_oracle) {
-                $reverted_from_foreign_key->restrictOnDelete();
-            }
+                ->on($table_name)
+                ->nullOnDelete();
         });
     }
 

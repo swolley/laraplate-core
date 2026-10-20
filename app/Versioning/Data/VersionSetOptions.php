@@ -25,8 +25,8 @@ final readonly class VersionSetOptions
             throw new InvalidArgumentException('A revert version set must reference its target set.');
         }
 
-        if ($kind === VersionSetKind::Change && $revertedFrom !== null) {
-            throw new InvalidArgumentException('A change version set cannot reference a reverted set.');
+        if ($kind !== VersionSetKind::Revert && $revertedFrom !== null) {
+            throw new InvalidArgumentException('Only a revert version set can reference a reverted set.');
         }
 
         $this->normalizePositiveId($actor, 'actor');

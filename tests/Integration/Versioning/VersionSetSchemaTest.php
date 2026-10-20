@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Core\Enums\CoreTables;
+use Modules\Core\Enums\VersionCaptureQuality;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Enums\VersionStrategy;
@@ -90,9 +91,7 @@ it('defines portable version set indexes and foreign keys', function (): void {
         ->and($reverted_from_foreign_key)->not->toBeNull()
         ->and($reverted_from_foreign_key['foreign_table'])->toBe($table_name)
         ->and($reverted_from_foreign_key['foreign_columns'])->toBe(['id'])
-        ->and(mb_strtolower((string) $reverted_from_foreign_key['on_delete']))->toBe(
-            Schema::getConnection()->getDriverName() === 'oracle' ? 'no action' : 'restrict',
-        )
+        ->and(mb_strtolower((string) $reverted_from_foreign_key['on_delete']))->toBe('set null')
         ->and($foreign_keys->contains(
             static fn (array $foreign_key): bool => $foreign_key['columns'] === [$user_foreign_key],
         ))->toBeFalse();
@@ -260,4 +259,24 @@ it('keeps the history tables append-only', function (): void {
         ->and(Schema::hasColumn('core_versions_sets', 'updated_at'))->toBeFalse()
         ->and(Version::UPDATED_AT)->toBeNull()
         ->and(VersionSet::UPDATED_AT)->toBeNull();
+});
+
+it('sets reverted_from_set_id to null when the target set is removed', function (): void {
+    $target = VersionSet::query()->forceCreate(['uuid' => (string) Str::uuid(), 'kind' => VersionSetKind::Change]);
+    $revert = VersionSet::query()->forceCreate([
+        'uuid' => (string) Str::uuid(),
+        'kind' => VersionSetKind::Revert,
+        'reverted_from_set_id' => $target->getKey(),
+    ]);
+
+    $target->delete();
+
+    expect($revert->fresh()->reverted_from_set_id)->toBeNull();
+});
+
+it('stores the capture quality of a set, best effort by default', function (): void {
+    $set = VersionSet::query()->forceCreate(['uuid' => (string) Str::uuid(), 'kind' => VersionSetKind::Baseline]);
+
+    expect($set->fresh()->capture)->toBe(VersionCaptureQuality::BestEffort)
+        ->and($set->fresh()->kind)->toBe(VersionSetKind::Baseline);
 });
