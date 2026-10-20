@@ -136,7 +136,7 @@ if (! function_exists('is_laraplate_owned_module')) {
      * Whether a module is an official Laraplate-owned distribution package.
      *
      * Resolution: App is never owned; module.json `laraplate_owned` when present;
-     * otherwise composer.json `name` matching `swolley/laraplate-*`.
+     * otherwise composer.json `name` matching `getlaraplate/laraplate-*`.
      */
     function is_laraplate_owned_module(string $name): bool
     {
@@ -185,7 +185,7 @@ if (! function_exists('laraplate_module_is_owned_at_path')) {
         $composer = json_decode((string) file_get_contents($composer_path), true);
         $package = is_array($composer) ? ($composer['name'] ?? null) : null;
 
-        return is_string($package) && str_starts_with($package, 'swolley/laraplate-');
+        return is_string($package) && str_starts_with($package, 'getlaraplate/laraplate-');
     }
 }
 
@@ -478,10 +478,11 @@ if (! function_exists('controllers')) {
             $is_app = (bool) preg_match("/[\\\\\/]app$/", $m);
 
             $controllers_path = $m . DIRECTORY_SEPARATOR . ($is_app ? 'Http' . DIRECTORY_SEPARATOR . 'Controllers' : $modules_controllers_folder);
+
             if (! is_dir($controllers_path)) {
                 continue;
             }
-            
+
             $controllers_files = File::allFiles($controllers_path);
 
             if ($is_app) {

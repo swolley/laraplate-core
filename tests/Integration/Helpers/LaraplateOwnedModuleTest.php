@@ -28,7 +28,7 @@ it('honours explicit laraplate_owned false over composer package name', function
     ], JSON_THROW_ON_ERROR));
 
     file_put_contents($path . DIRECTORY_SEPARATOR . 'composer.json', json_encode([
-        'name' => 'swolley/laraplate-fake',
+        'name' => 'getlaraplate/laraplate-fake',
     ], JSON_THROW_ON_ERROR));
 
     try {
@@ -40,7 +40,7 @@ it('honours explicit laraplate_owned false over composer package name', function
     }
 });
 
-it('falls back to swolley/laraplate-* composer name when flag is absent', function (): void {
+it('falls back to getlaraplate/laraplate-* composer name when flag is absent', function (): void {
     $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'laraplate-owned-' . uniqid('', true);
     mkdir($path);
 
@@ -49,7 +49,7 @@ it('falls back to swolley/laraplate-* composer name when flag is absent', functi
     ], JSON_THROW_ON_ERROR));
 
     file_put_contents($path . DIRECTORY_SEPARATOR . 'composer.json', json_encode([
-        'name' => 'swolley/laraplate-fake',
+        'name' => 'getlaraplate/laraplate-fake',
     ], JSON_THROW_ON_ERROR));
 
     try {

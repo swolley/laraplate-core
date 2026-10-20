@@ -1,6 +1,6 @@
 {
-  "name": "swolley/laraplate-core",
-  "vendor": "swolley",
+  "name": "getlaraplate/laraplate-core",
+  "vendor": "getlaraplate",
   "description": "Core Module contains all the necessary functionalities for build up a new Laravel application.",
   "version": "v1.79.0",
   "keywords": [
