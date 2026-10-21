@@ -8,6 +8,7 @@ use Modules\Core\Http\Controllers\CrudController;
 Route::controller(CrudController::class)->group(function (): void {
     Route::match(['get', 'post'], '/select/{module}/{entity}', 'list')->name('list');
     Route::match(['get', 'post'], '/facets/{module}/{entity}', 'facets')->name('facets');
+    Route::match(['get', 'post'], '/aggregate/{module}/{entity}', 'aggregate')->name('aggregate')->middleware('throttle:aggregate');
     Route::get('/freshness/{module}/{entity}', 'freshness')->name('freshness');
     Route::get('/detail/{module}/{entity}', 'detail')->name('detail');
     Route::get('/tree/{module}/{entity}', 'tree')->name('tree');

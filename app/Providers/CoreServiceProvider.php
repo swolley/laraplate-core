@@ -936,5 +936,15 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
             return Limit::perMinute(config()->integer('core.api.rate_limit_per_minute', 600))->by($key);
         });
+
+        // The aggregate route, on top of the one above: per signed-in user, else per client address. The anonymous
+        // user is one shared account that an `/api` call is authenticated as, so it counts as a guest here, or
+        // every visitor would spend the same allowance. The ceiling is read when a request arrives.
+        RateLimiter::for('aggregate', static function (Request $request): Limit {
+            $user = $request->user();
+            $limit = Limit::perMinute(AggregateLimits::fromConfig()->ratePerMinute);
+
+            return $user === null || $user->isGuest() ? $limit->by($request->ip()) : $limit->by($user->getAuthIdentifier());
+        });
     }
 }

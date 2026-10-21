@@ -13,14 +13,18 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\MultipleRecordsFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\RecordsNotFoundException as DatabaseRecordsNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Approvals\PendingDeletionLock;
+use Modules\Core\Enums\AggregateErrorCode;
+use Modules\Core\Exceptions\AggregateException;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\ResponseBuilder;
+use Modules\Core\Http\Requests\AggregateRequest;
 use Modules\Core\Http\Requests\CrudRequest;
 use Modules\Core\Http\Requests\DetailRequest;
 use Modules\Core\Http\Requests\DomainActionRequest;
@@ -84,6 +88,46 @@ class CrudController extends Controller
             $request,
             shouldCache: false,
         );
+    }
+
+    /**
+     * The figures of an aggregate request: groups, totals and periods, computed under the permissions of the list.
+     *
+     * It does not go through {@see handleServiceCall()}: that mapping answers a database failure with the text of
+     * the exception, which holds the SQL, and an aggregate answers a failure it did not foresee with a message of
+     * its own. Never cached, because the figures follow the rows.
+     *
+     * Answers: 200 `{data, meta}`; 422 `{error: {code, message, field?}}` for a request the contract refuses; the
+     * status of a refused permission; 500 `{error: {message}}`, reported, for anything else.
+     */
+    final public function aggregate(AggregateRequest $request): Response
+    {
+        try {
+            return new JsonResponse($this->crudService->aggregate($request->parsed(), $request->aggregateQuery())->toArray());
+        } catch (AggregateException $exception) {
+            return $exception->toResponse($request);
+        } catch (AuthorizationException $exception) {
+            return $this->buildResponse(
+                new CrudResult(
+                    data: null,
+                    error: $exception->getMessage(),
+                    statusCode: $this->authorizationFailureStatus($request),
+                ),
+                $request,
+            );
+        } catch (ValidationException $exception) {
+            // The list data of the request refuses what the validation let through, a malformed scope filter.
+            $field = array_key_first($exception->errors());
+
+            return $this->aggregateRefusal($request, $exception->getMessage(), $field === null ? null : (string) $field);
+        } catch (InvalidArgumentException $exception) {
+            // The guards of the list and of its filters: their message names fields, never SQL.
+            return $this->aggregateRefusal($request, $exception->getMessage());
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return new JsonResponse(['error' => ['message' => 'The aggregate could not be computed.']], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**
@@ -420,6 +464,14 @@ class CrudController extends Controller
         } catch (Throwable $ex) {
             return $this->handleServiceCall(fn () => throw $ex, $request, $model, shouldCache: false);
         }
+    }
+
+    /**
+     * A refusal of the aggregate that has no contract code of its own: a field the request names wrongly.
+     */
+    private function aggregateRefusal(Request $request, string $message, ?string $field = null): Response
+    {
+        return (new AggregateException(AggregateErrorCode::InvalidField, $message, $field))->toResponse($request);
     }
 
     /**
