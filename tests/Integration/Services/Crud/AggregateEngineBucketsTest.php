@@ -69,6 +69,14 @@ function aggregate_buckets_order_reads(): array
     ));
 }
 
+/**
+ * Insert an order whose date is stored as the given text, past the cast of the model.
+ */
+function aggregate_buckets_raw_order(string $ordered_at): void
+{
+    AggregateOrderStubModel::query()->insert(['status' => 'new', 'quantity' => 1, 'ordered_at' => $ordered_at, 'is_paid' => false]);
+}
+
 it('fills empty buckets', function (): void {
     AggregateTestKit::seedOrders([
         ['ordered_at' => '2026-01-10 09:00:00', 'total' => '10'],
@@ -272,6 +280,31 @@ it('the period limits the rows', function (array $group, array $series): void {
         ['key' => '2026-01-01', 'label' => null, 'values' => ['count' => 3]],
     ]],
 ]);
+
+it('a stored date the database cannot read as a day fails the request', function (): void {
+    AggregateTestKit::seedOrders([['ordered_at' => '2026-01-10 10:00:00']]);
+    aggregate_buckets_raw_order('2026-01-15T25:99:00');
+
+    expect(fn (): AggregateResult => aggregate_buckets([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'ordered_at', 'bucket' => 'month'],
+        'period' => ['field' => 'ordered_at', 'from' => '2026-01-01', 'to' => '2026-01-31'],
+    ]))->toThrow(UnexpectedValueException::class, 'the database gave null');
+});
+
+it('a day the database gives outside the period is left out of the series', function (): void {
+    AggregateTestKit::seedOrders([['ordered_at' => '2026-01-10 10:00:00']]);
+    aggregate_buckets_raw_order('2026-01-31 23:30:00-02:00');
+
+    $result = aggregate_buckets([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'ordered_at', 'bucket' => 'month'],
+        'period' => ['field' => 'ordered_at', 'from' => '2026-01-01', 'to' => '2026-01-31'],
+    ]);
+
+    expect($result->series)->toBe([['key' => '2026-01-01', 'label' => null, 'values' => ['count' => 1]]])
+        ->and($result->total)->toBe(['count' => 2]);
+});
 
 it('a period longer than max_period_days is PERIOD_TOO_LONG', function (): void {
     config(['core.aggregate.max_period_days' => 30]);

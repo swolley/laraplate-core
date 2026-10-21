@@ -36,9 +36,10 @@ final class BucketSeries
      * The rows are those of the scope: narrow it to the period first ({@see PeriodPlan::narrow()}). The day of a row
      * is read from the first ten characters of the day expression (Oracle's `TRUNC` gives a date-time), as a day of
      * the application time zone; a day outside the buckets of the period, which a stored value with a time zone of
-     * its own could give, is left out of the series.
+     * its own could give, is left out of the series. A row whose day cannot be read fails the request instead.
      *
      * @throws AggregateException
+     * @throws UnexpectedValueException when the database gives a row of the period no `Y-m-d` day
      *
      * @return list<array{key: string, label: null, values: array<string, int|float|string|null>}>
      */
@@ -62,6 +63,7 @@ final class BucketSeries
      * @param  list<AggregateMeasure>  $measures
      *
      * @throws AggregateException
+     * @throws UnexpectedValueException
      *
      * @return array<string, list<array<array-key, mixed>>>
      */
@@ -93,25 +95,29 @@ final class BucketSeries
 
         foreach ($rows->select($select)->groupByRaw($day)->get() as $row) {
             $row = (array) $row;
-            $key = self::bucketKey($row[self::DAY_ALIAS] ?? null, $bucket, $timezone);
-
-            if ($key !== null) {
-                $days[$key][] = $row;
-            }
+            $days[self::bucketKey($row[self::DAY_ALIAS] ?? null, $bucket, $timezone)][] = $row;
         }
 
         return $days;
     }
 
     /**
-     * The key of the bucket that holds the day the database gave, or null when it gave no day.
+     * The key of the bucket that holds the day the database gave.
+     *
+     * @throws UnexpectedValueException when the database gave no `Y-m-d` day for a row of the period: a stored value its
+     *                                  day expression cannot read gives null, and a session with another date format
+     *                                  gives other text. Either would drop the row from the series while the total
+     *                                  counts it.
      */
-    private static function bucketKey(mixed $day, TimeBucket $bucket, string $timezone): ?string
+    private static function bucketKey(mixed $day, TimeBucket $bucket, string $timezone): string
     {
         $parts = [];
 
         if (! is_string($day) || preg_match('/^(\d{4})-(\d{2})-(\d{2})/', $day, $parts) !== 1) {
-            return null;
+            throw new UnexpectedValueException(sprintf(
+                'A row of the period has no day: the database gave %s where a Y-m-d date was expected.',
+                is_string($day) ? sprintf('"%s"', $day) : get_debug_type($day),
+            ));
         }
 
         $date = CarbonImmutable::createFromDate((int) $parts[1], (int) $parts[2], (int) $parts[3], $timezone)->startOfDay();
