@@ -69,6 +69,48 @@ return [
         'rate_limit_per_minute' => 600,
     ],
 
+    /**
+     * Ceilings of the aggregate route and of the assistant tool built on it. A value below 1 or not numeric is
+     * replaced by its default (see AggregateLimits).
+     */
+    'aggregate' => [
+        /**
+         * Measures one request may compute.
+         */
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'max_measures' => env('CORE_AGGREGATE_MAX_MEASURES', 3),
+
+        /**
+         * Groups one request may return.
+         */
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'max_groups' => env('CORE_AGGREGATE_MAX_GROUPS', 50),
+
+        /**
+         * Points one result may hold: a bucketed period gives one point per bucket.
+         */
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'max_points' => env('CORE_AGGREGATE_MAX_POINTS', 400),
+
+        /**
+         * Longest period one request may span, in days.
+         */
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'max_period_days' => env('CORE_AGGREGATE_MAX_PERIOD_DAYS', 1096),
+
+        /**
+         * Objects (widgets) the assistant may show in one message.
+         */
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'max_objects_per_message' => env('CORE_AGGREGATE_MAX_OBJECTS_PER_MESSAGE', 6),
+
+        /**
+         * Aggregate requests a minute per user.
+         */
+        // @phpstan-ignore larastan.noEnvCallsOutsideOfConfig
+        'rate_per_minute' => env('CORE_AGGREGATE_RATE_PER_MINUTE', 60),
+    ],
+
     'api_tokens' => [
         /**
          * Longest life of a personal access token, in days.
