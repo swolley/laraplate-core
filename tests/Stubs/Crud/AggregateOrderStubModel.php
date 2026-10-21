@@ -15,7 +15,7 @@ use Illuminate\Support\Carbon;
  * with no column behind it.
  *
  * @property int $id
- * @property int $customer_id
+ * @property int|null $customer_id
  * @property string $status
  * @property string|null $total
  * @property int $quantity

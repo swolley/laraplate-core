@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * The customer side of the aggregate tests: the to-one relation an order is grouped and labelled by.
+ * The customer side of the aggregate tests: the to-one relation an order is grouped and labelled by. Its name
+ * is also kept per locale, for a translated label.
  *
  * @property int $id
  * @property string $name
@@ -28,5 +29,13 @@ final class AggregateCustomerStubModel extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(AggregateOrderStubModel::class, 'customer_id');
+    }
+
+    /**
+     * @return HasMany<AggregateCustomerTranslationStubModel, $this>
+     */
+    public function translations(): HasMany
+    {
+        return $this->hasMany(AggregateCustomerTranslationStubModel::class, 'customer_id');
     }
 }

@@ -167,9 +167,7 @@ final readonly class AggregateQuery
             throw self::invalid('measures', 'An aggregate needs a list of at least one measure.');
         }
 
-        if ($limits->maxMeasures < count($value)) {
-            throw self::invalid('measures', sprintf('An aggregate holds at most %d measures.', $limits->maxMeasures));
-        }
+        $limits->assertMeasureCount(count($value));
 
         $measures = [];
         $names = [];
@@ -333,13 +331,7 @@ final readonly class AggregateQuery
             throw self::invalid('limit', 'The limit is a whole number of at least 1.');
         }
 
-        if ($limit > $limits->maxGroups) {
-            throw new AggregateException(
-                AggregateErrorCode::TooManyGroups,
-                sprintf('The limit is at most %d groups.', $limits->maxGroups),
-                'limit',
-            );
-        }
+        $limits->assertGroupLimit($limit);
 
         return $limit;
     }

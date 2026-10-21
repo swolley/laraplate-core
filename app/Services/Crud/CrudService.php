@@ -1881,8 +1881,11 @@ class CrudService
 
     /**
      * A group label is a column of the to-one relation whose foreign key is the group field (spec 4.7): a
-     * `BelongsTo`, or a label source the model declares. A source of a translated label reads the column it
-     * declares, so that column is the only one a request may name through it.
+     * `BelongsTo`, or a label source the model declares. It is judged as the label resolver will read it: a
+     * declared source whose translation resolves ({@see facetLabelSourceTranslation()}, which the resolver calls
+     * on the same related model) reads its translation column, so that column is the only one a request may name
+     * through it; any other target, a declared source whose translation does not resolve included, reads the
+     * column of the related model.
      *
      * @throws AggregateException
      */
@@ -1895,12 +1898,14 @@ class CrudService
         }
 
         $source = $model instanceof ProvidesFacetLabelSources ? ($model->facetLabelSources()[Str::before($label, '.')] ?? null) : null;
-        $translated = $source instanceof FacetLabelSource
-            && $source->translationRelation !== null
-            && $group_field === $this->facetKey($source->foreignKey);
+        $translation = $source instanceof FacetLabelSource
+            && $group_field === $this->facetKey($source->foreignKey)
+            && $target['related'] instanceof $source->relatedClass
+                ? $this->facetLabelSourceTranslation($target['related'], $source)
+                : null;
 
-        $exists = $translated
-            ? $target['column'] === $source->translationColumn
+        $exists = $translation !== null
+            ? $target['column'] === $translation['column']
             : ColumnKinds::exists($target['related'], $target['column']);
 
         if (! $exists) {
@@ -1947,11 +1952,13 @@ class CrudService
             default => null,
         };
 
-        throw_if($refusal !== null, new AggregateException(
-            AggregateErrorCode::NotMeasurable,
-            sprintf('"%s" cannot be measured with %s: %s.', $measure->field, $measure->fn, $refusal),
-            $field,
-        ));
+        if ($refusal !== null) {
+            throw new AggregateException(
+                AggregateErrorCode::NotMeasurable,
+                sprintf('"%s" cannot be measured with %s: %s.', $measure->field, $measure->fn, $refusal),
+                $field,
+            );
+        }
     }
 
     /**

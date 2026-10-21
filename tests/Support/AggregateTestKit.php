@@ -12,19 +12,23 @@ use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Casts\ListRequestData;
 use Modules\Core\Inspector\SchemaInspector;
+use Modules\Core\Models\ACL;
+use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
 use Modules\Core\Models\User;
+use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\Crud\AggregateCustomerStubModel;
+use Modules\Core\Tests\Stubs\Crud\AggregateCustomerTranslationStubModel;
 use Modules\Core\Tests\Stubs\Crud\AggregateOrderStubModel;
 use ReflectionClass;
 use ReflectionProperty;
 
 /**
- * What every aggregate test needs: the two stub tables, a superadmin to call the CRUD service as, a list
- * request built without the HTTP layer, and rows to measure.
+ * What every aggregate test needs: the stub tables, a superadmin or a reader under an ACL to call the CRUD
+ * service as, a list request built without the HTTP layer, and rows to measure.
  *
- * The tables are `aggregate_customers` and `aggregate_orders`, read through
- * {@see AggregateCustomerStubModel} and {@see AggregateOrderStubModel}.
+ * The tables are `aggregate_customers`, `aggregate_customer_translations` and `aggregate_orders`, read through
+ * {@see AggregateCustomerStubModel}, {@see AggregateCustomerTranslationStubModel} and {@see AggregateOrderStubModel}.
  */
 final class AggregateTestKit
 {
@@ -42,9 +46,16 @@ final class AggregateTestKit
             $table->string('country');
         });
 
-        Schema::create('aggregate_orders', function (Blueprint $table): void {
+        Schema::create('aggregate_customer_translations', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('customer_id')->constrained('aggregate_customers');
+            $table->string('locale', 5);
+            $table->string('name');
+        });
+
+        Schema::create('aggregate_orders', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('customer_id')->nullable()->constrained('aggregate_customers');
             $table->string('status');
             $table->decimal('total', 15, 4)->nullable();
             $table->integer('quantity');
@@ -54,6 +65,7 @@ final class AggregateTestKit
         });
 
         SchemaInspector::getInstance()->clearTable('aggregate_customers');
+        SchemaInspector::getInstance()->clearTable('aggregate_customer_translations');
         SchemaInspector::getInstance()->clearTable('aggregate_orders');
     }
 
@@ -108,15 +120,54 @@ final class AggregateTestKit
     }
 
     /**
+     * Create a user whose role may select each given model, narrowed by the row-level ACL given for it, if any,
+     * and log it in.
+     *
+     * @param  array<class-string<Model>, FiltersGroup|null>  $grants
+     */
+    public static function asReader(array $grants): User
+    {
+        $role = Role::factory()->create(['name' => 'aggregate_reader_' . uniqid(), 'guard_name' => 'web']);
+
+        foreach ($grants as $model_class => $filters) {
+            $permission = Permission::findOrCreate(PermissionName::forModel(new $model_class, 'select'), 'web');
+            $role->givePermissionTo($permission);
+
+            if ($filters instanceof FiltersGroup) {
+                $acl = new ACL;
+                $acl->setSkipValidation(true);
+                $acl->forceFill([
+                    'permission_id' => $permission->id,
+                    'role_id' => $role->id,
+                    'filters' => $filters,
+                    'unrestricted' => false,
+                    'priority' => 10,
+                    'is_active' => true,
+                ]);
+                $acl->save();
+            }
+        }
+
+        $reader = User::factory()->create();
+        $reader->assignRole($role);
+        auth()->login($reader);
+
+        return $reader;
+    }
+
+    /**
      * Insert orders. A row names only the columns that matter to its test: `customer_id` defaults to a shared
-     * customer, the others to an unpaid order of one unit, with no amount and no currency.
+     * customer (a row that names it as null has no customer), the others to an unpaid order of one unit, with
+     * no amount and no currency.
      *
      * @param  list<array<string, mixed>>  $rows
      */
     public static function seedOrders(array $rows): void
     {
         foreach ($rows as $row) {
-            $row['customer_id'] ??= self::defaultCustomerId();
+            if (! array_key_exists('customer_id', $row)) {
+                $row['customer_id'] = self::defaultCustomerId();
+            }
 
             AggregateOrderStubModel::query()->create($row + [
                 'status' => 'new',

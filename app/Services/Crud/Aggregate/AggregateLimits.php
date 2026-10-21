@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Core\Services\Crud\Aggregate;
 
+use Modules\Core\Enums\AggregateErrorCode;
+use Modules\Core\Exceptions\AggregateException;
+
 /**
  * The ceilings of one aggregate request and of the assistant tool built on it, read from `core.aggregate.*`.
  *
@@ -43,6 +46,40 @@ final readonly class AggregateLimits
             maxObjectsPerMessage: self::configured('max_objects_per_message', self::DEFAULT_MAX_OBJECTS_PER_MESSAGE),
             ratePerMinute: self::configured('rate_per_minute', self::DEFAULT_RATE_PER_MINUTE),
         );
+    }
+
+    /**
+     * Refuses more measures than one request may hold. The request validator and the engine both call it, so a
+     * query built without the validator meets the same limit and the same message.
+     *
+     * @throws AggregateException INVALID_FIELD on `measures`
+     */
+    public function assertMeasureCount(int $count): void
+    {
+        if ($count > $this->maxMeasures) {
+            throw new AggregateException(
+                AggregateErrorCode::InvalidField,
+                sprintf('An aggregate holds at most %d measures.', $this->maxMeasures),
+                'measures',
+            );
+        }
+    }
+
+    /**
+     * Refuses a limit of groups above the most a request may show, as {@see self::assertMeasureCount()} does for
+     * the measures.
+     *
+     * @throws AggregateException TOO_MANY_GROUPS on `limit`
+     */
+    public function assertGroupLimit(int $limit): void
+    {
+        if ($limit > $this->maxGroups) {
+            throw new AggregateException(
+                AggregateErrorCode::TooManyGroups,
+                sprintf('The limit is at most %d groups.', $this->maxGroups),
+                'limit',
+            );
+        }
     }
 
     /**
