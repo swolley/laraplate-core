@@ -29,7 +29,8 @@ final readonly class AggregateResult
     ) {}
 
     /**
-     * The result as the route answers it: `other` and `compare` are present only when the request asked for them.
+     * The result as the route answers it: `other` and `compare` are present only when the request asked for them,
+     * and `other` only when groups were left out of the series.
      *
      * @return array{data: array<string, mixed>, meta: array<string, mixed>}
      */

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
@@ -31,10 +32,10 @@ beforeEach(function (): void {
  *
  * @param  array<string, mixed>  $request
  */
-function aggregate_groups(array $request, ?Model $model = null): AggregateResult
+function aggregate_groups(array $request, ?FiltersGroup $filters = null, ?Model $model = null): AggregateResult
 {
     return app(CrudService::class)->aggregate(
-        AggregateTestKit::listData($model ?? new AggregateOrderStubModel),
+        AggregateTestKit::listData($model ?? new AggregateOrderStubModel, $filters),
         AggregateQuery::fromArray($request, AggregateLimits::fromConfig()),
     );
 }
@@ -47,7 +48,7 @@ function aggregate_groups(array $request, ?Model $model = null): AggregateResult
 function aggregate_groups_refusal(array $request, ?Model $model = null): AggregateException
 {
     try {
-        aggregate_groups($request, $model);
+        aggregate_groups($request, model: $model);
     } catch (AggregateException $exception) {
         return $exception;
     }
@@ -171,6 +172,78 @@ it('a relation group hides related rows the user cannot see', function (): void 
         ->and($result->meta['group_count'])->toBe(1);
 });
 
+it('acl narrows the groups of a relation column', function (): void {
+    $rossi = aggregate_groups_customer('Rossi', 'IT');
+    $dupont = aggregate_groups_customer('Dupont', 'FR');
+    $muller = aggregate_groups_customer('Muller', 'DE');
+    AggregateTestKit::seedOrders([
+        ['customer_id' => $rossi->id, 'status' => 'paid'],
+        ['customer_id' => $muller->id, 'status' => 'new'],
+        ['customer_id' => $dupont->id, 'status' => 'new'],
+        ['customer_id' => $rossi->id, 'status' => 'paid'],
+        ['customer_id' => $muller->id, 'status' => 'new'],
+        ['customer_id' => $dupont->id, 'status' => 'paid'],
+        ['customer_id' => $rossi->id, 'status' => 'new'],
+        ['customer_id' => $muller->id, 'status' => 'new'],
+        ['customer_id' => $dupont->id, 'status' => 'new'],
+    ]);
+    AggregateTestKit::asReader([
+        AggregateOrderStubModel::class => new FiltersGroup([new Filter('status', 'paid')]),
+        AggregateCustomerStubModel::class => null,
+    ]);
+
+    $result = aggregate_groups([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'customer.country'],
+        'limit' => 1,
+        'other' => true,
+    ]);
+
+    expect($result->series)->toBe([['key' => 'IT', 'label' => 'IT', 'values' => ['count' => 2]]])
+        ->and($result->other)->toBe(['count' => 1, 'groups' => 1])
+        ->and($result->meta['group_count'])->toBe(2);
+});
+
+it('a list filter narrows the groups of a relation column', function (): void {
+    $rossi = aggregate_groups_customer('Rossi', 'IT');
+    $dupont = aggregate_groups_customer('Dupont', 'FR');
+    $muller = aggregate_groups_customer('Muller', 'DE');
+    AggregateTestKit::seedOrders([
+        ['customer_id' => $rossi->id, 'status' => 'paid'],
+        ['customer_id' => $muller->id, 'status' => 'new'],
+        ['customer_id' => $dupont->id, 'status' => 'new'],
+        ['customer_id' => $rossi->id, 'status' => 'paid'],
+        ['customer_id' => $muller->id, 'status' => 'new'],
+        ['customer_id' => $dupont->id, 'status' => 'paid'],
+        ['customer_id' => $rossi->id, 'status' => 'new'],
+        ['customer_id' => $muller->id, 'status' => 'new'],
+        ['customer_id' => $dupont->id, 'status' => 'new'],
+    ]);
+
+    $result = aggregate_groups(
+        ['measures' => [['fn' => 'count']], 'group_by' => ['field' => 'customer.country']],
+        new FiltersGroup([new Filter('status', 'paid')]),
+    );
+
+    expect($result->series)->toBe([
+        ['key' => 'IT', 'label' => 'IT', 'values' => ['count' => 2]],
+        ['key' => 'FR', 'label' => 'FR', 'values' => ['count' => 1]],
+    ])
+        ->and($result->meta['group_count'])->toBe(2);
+});
+
+it('a relation group or a group label on an entity the user may not select is refused', function (array $group): void {
+    $ada = aggregate_groups_customer('Ada');
+    AggregateTestKit::seedOrders([['customer_id' => $ada->id]]);
+    AggregateTestKit::asReader([AggregateOrderStubModel::class => null]);
+
+    expect(fn (): AggregateResult => aggregate_groups(['measures' => [['fn' => 'count']], 'group_by' => $group]))
+        ->toThrow(AuthorizationException::class);
+})->with([
+    'a relation column' => [['field' => 'customer.country']],
+    'a label through a relation' => [['field' => 'customer_id', 'label' => 'customer.name']],
+]);
+
 it('a foreign key group takes labels through group_by.label', function (): void {
     $ada = aggregate_groups_customer('Ada');
     $bob = aggregate_groups_customer('Bob');
@@ -225,7 +298,7 @@ it('a foreign key group takes a translated label through a declared label source
     $result = aggregate_groups([
         'measures' => [['fn' => 'count']],
         'group_by' => ['field' => 'customer_id', 'label' => 'translated_customer.name'],
-    ], new AggregateLabelledOrderStubModel);
+    ], model: new AggregateLabelledOrderStubModel);
 
     expect($result->series)->toBe([['key' => $ada->id, 'label' => 'Ada in italiano', 'values' => ['count' => 1]]]);
 });
@@ -237,7 +310,7 @@ it('a declared label source whose translation does not resolve labels from the r
     $result = aggregate_groups([
         'measures' => [['fn' => 'count']],
         'group_by' => ['field' => 'customer_id', 'label' => $label],
-    ], new AggregateLabelledOrderStubModel);
+    ], model: new AggregateLabelledOrderStubModel);
 
     expect($result->series)->toBe([['key' => $ada->id, 'label' => 'Ada', 'values' => ['count' => 1]]]);
 })->with([
@@ -249,7 +322,17 @@ it('a declared label source whose translation does not resolve refuses a column 
     $refusal = aggregate_groups_refusal([
         'measures' => [['fn' => 'count']],
         'group_by' => ['field' => 'customer_id', 'label' => 'unresolved_translation.title'],
-    ], new AggregateLabelledOrderStubModel);
+    ], model: new AggregateLabelledOrderStubModel);
+
+    expect($refusal->errorCode)->toBe(AggregateErrorCode::InvalidField)
+        ->and($refusal->field)->toBe('group_by.label');
+});
+
+it('a translated label source refuses a column other than its translation column', function (): void {
+    $refusal = aggregate_groups_refusal([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'customer_id', 'label' => 'translated_customer.country'],
+    ], model: new AggregateLabelledOrderStubModel);
 
     expect($refusal->errorCode)->toBe(AggregateErrorCode::InvalidField)
         ->and($refusal->field)->toBe('group_by.label');
@@ -264,22 +347,40 @@ it('limit with other', function (): void {
         ['currency' => null, 'total' => '9.75'],
         ['currency' => 'USD', 'total' => '6.5'],
         ['currency' => 'EUR', 'total' => '30.5'],
+        ['currency' => 'GBP', 'total' => null],
+        ['currency' => 'USD', 'total' => '6'],
+        ['currency' => 'EUR', 'total' => '2.5'],
     ]);
 
     $result = aggregate_groups([
-        'measures' => [['fn' => 'count'], ['fn' => 'avg', 'field' => 'total']],
+        'measures' => [['fn' => 'count'], ['fn' => 'avg', 'field' => 'total'], ['fn' => 'min', 'field' => 'total']],
         'group_by' => ['field' => 'currency'],
         'limit' => 2,
         'other' => true,
     ]);
 
     expect($result->series)->toBe([
-        ['key' => 'EUR', 'label' => null, 'values' => ['count' => 3, 'avg_total' => 20.5]],
-        ['key' => 'USD', 'label' => null, 'values' => ['count' => 2, 'avg_total' => 6.0]],
+        ['key' => 'EUR', 'label' => null, 'values' => ['count' => 4, 'avg_total' => 16.0, 'min_total' => 2.5]],
+        ['key' => 'USD', 'label' => null, 'values' => ['count' => 3, 'avg_total' => 6.0, 'min_total' => 5.5]],
     ])
-        ->and($result->other)->toBe(['count' => 2, 'avg_total' => 25.0, 'groups' => 2])
+        ->and($result->other)->toBe(['count' => 3, 'avg_total' => 25.0, 'min_total' => 9.75, 'groups' => 2])
         ->and($result->meta['truncated'])->toBeTrue()
         ->and($result->meta['group_count'])->toBe(4);
+});
+
+it('other is left out when no group was left out', function (): void {
+    AggregateTestKit::seedOrders([['status' => 'paid'], ['status' => 'paid'], ['status' => 'new']]);
+
+    $result = aggregate_groups([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'status'],
+        'limit' => 2,
+        'other' => true,
+    ]);
+
+    expect(array_column($result->series, 'key'))->toBe(['paid', 'new'])
+        ->and($result->toArray()['data'])->not->toHaveKey('other')
+        ->and($result->meta['truncated'])->toBeFalse();
 });
 
 it('the rest leaves out a null group that is shown', function (): void {

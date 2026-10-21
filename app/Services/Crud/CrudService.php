@@ -459,7 +459,7 @@ class CrudService
      * The engine reads the rows and the related entities through an {@see AggregateScope} of closures over the
      * helpers of the facets (ruling R5).
      *
-     * @throws AuthorizationException when the caller may not select the entity, or a relation the filters name
+     * @throws AuthorizationException when the caller may not select the entity, a relation the filters name, or the related entity of a relation group or of a group label
      * @throws AggregateException when a field is not a column the aggregate can read, the caller cannot read it, or it does not suit its function
      */
     public function aggregate(ListRequestData $base, AggregateQuery $query): AggregateResult

@@ -6,6 +6,7 @@ namespace Modules\Core\Services\Crud\Aggregate;
 
 use Carbon\CarbonImmutable;
 use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as BaseQueryBuilder;
 use Illuminate\Database\Query\Expression;
@@ -49,6 +50,7 @@ final class AggregateEngine
      * {@see AggregateQuery::fromArray()}, which applies them to a request.
      *
      * @throws AggregateException when the query holds more measures or asks for more groups than the limits, a measure is not a function of the closed list or names a field that is not a column of the model, or the group field is not a column the engine can group by
+     * @throws AuthorizationException when the caller may not select the related entity of a relation group or of a group label, which the scope reads as the facets do
      */
     public function run(AggregateScope $scope, AggregateQuery $query, CarbonImmutable $now): AggregateResult
     {
@@ -168,12 +170,13 @@ final class AggregateEngine
 
     /**
      * The groups of a column (spec 4.3): the series of the groups shown, the total over every row, the rest of
-     * the groups when asked, and how many groups there are.
+     * the groups when asked and some were left out, and how many groups there are.
      *
      * A grouped request with no limit is refused when it has more groups than the limit allows, before its
      * series is read. A null value of the column is a group of its own, with the key `null` and no label.
      *
      * @throws AggregateException
+     * @throws AuthorizationException
      */
     private function grouped(AggregateScope $scope, AggregateQuery $query, AggregateGroup $group, CarbonImmutable $now): AggregateResult
     {
@@ -205,9 +208,10 @@ final class AggregateEngine
             $series[] = ['key' => $shown['key'], 'label' => $labels[$index], 'values' => $shown['values']];
         }
 
+        $truncated = $group_count > count($series);
         $other = null;
 
-        if ($query->other) {
+        if ($query->other && $truncated) {
             $rest = $this->rest($rows(), $column, $keys);
             $rest_row = (array) $rest->select($this->measureColumns($scope->model, $rest->getGrammar(), $query->measures))->first();
 
@@ -222,7 +226,7 @@ final class AggregateEngine
             meta: [
                 'row_count' => $row_count,
                 'group_count' => $group_count,
-                'truncated' => $group_count > count($series),
+                'truncated' => $truncated,
                 'generated_at' => $now->toIso8601ZuluString(),
             ],
         );
