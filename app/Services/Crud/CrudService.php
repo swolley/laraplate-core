@@ -461,7 +461,7 @@ class CrudService
      * helpers of the facets (ruling R5).
      *
      * @throws AuthorizationException when the caller may not select the entity, a relation the filters name, or the related entity of a relation group or of a group label
-     * @throws AggregateException when a field is not a column the aggregate can read, the caller cannot read it, or it does not suit its function
+     * @throws AggregateException when a field or a filter property is not one the aggregate can read, the caller cannot read it, or it does not suit its function
      */
     public function aggregate(ListRequestData $base, AggregateQuery $query): AggregateResult
     {
@@ -475,6 +475,10 @@ class CrudService
             'select',
             $model->getConnectionName(),
         );
+
+        if ($filters instanceof FiltersGroup) {
+            $this->assertAggregateFilters($model, $filters);
+        }
 
         // The fields of an aggregate are not list columns: they are checked below, against the aggregate rules.
         $this->authorizeRequestedRelations($base, include_columns: false);
@@ -1275,6 +1279,27 @@ class CrudService
     }
 
     /**
+     * The properties the filters of a request name, through their nested groups. A scope filter names none, and a
+     * relation filter comes only from an ACL.
+     *
+     * @return list<string>
+     */
+    private static function filterProperties(FiltersGroup $filters): array
+    {
+        $properties = [];
+
+        foreach ($filters->filters as $filter) {
+            if ($filter instanceof FiltersGroup) {
+                array_push($properties, ...self::filterProperties($filter));
+            } elseif ($filter instanceof Filter) {
+                $properties[] = $filter->property;
+            }
+        }
+
+        return $properties;
+    }
+
+    /**
      * Narrow a modifications query to the requests on $model's table the user may decide on: the
      * table's `approve` ACL restricts which records, and a pending create, which has no record yet
      * for the ACL to read, stays in. A trashed record awaiting a restore, or one hidden while its
@@ -1389,12 +1414,8 @@ class CrudService
      */
     private function assertReadableFilters(Model $model, FiltersGroup $filters): void
     {
-        foreach ($filters->filters as $filter) {
-            if ($filter instanceof FiltersGroup) {
-                $this->assertReadableFilters($model, $filter);
-            } elseif ($filter instanceof Filter) {
-                ReadableColumnGuard::assertReadablePath($model, $filter->property);
-            }
+        foreach (self::filterProperties($filters) as $property) {
+            ReadableColumnGuard::assertReadablePath($model, $property);
         }
     }
 
@@ -1872,6 +1893,33 @@ class CrudService
 
         if ($period_field !== null) {
             $this->assertTemporal($model, $period_field, 'period.field');
+        }
+    }
+
+    /**
+     * The filters of an aggregate obey the rules of its other fields (spec 4.2), each refused under
+     * `filters.<property>`: a property of the entity itself exists first, as a column, a JSON path of one or a
+     * property the filters read elsewhere ({@see ModelPropertyResolver}), and then the caller must be able to read
+     * every name of the path of a property, through its relations. Checked before the relations the filters name
+     * are authorized, whose guards refuse an unreadable column with the exception they raise for a name that is
+     * not a relation.
+     *
+     * @throws AggregateException INVALID_FIELD when a property of the entity is none of those, UNREADABLE_FIELD when the caller may not read a name of a path
+     */
+    private function assertAggregateFilters(Model $model, FiltersGroup $filters): void
+    {
+        foreach (self::filterProperties($filters) as $property) {
+            $field = 'filters.' . $property;
+
+            if (
+                ! str_contains($property, '.')
+                && ! ColumnKinds::exists($model, Str::before($property, '->'))
+                && ModelPropertyResolver::resolve($model, $property) === null
+            ) {
+                throw $this->unknownAggregateField($property, $field);
+            }
+
+            $this->assertReadableAggregatePath($model, $property, $field);
         }
     }
 

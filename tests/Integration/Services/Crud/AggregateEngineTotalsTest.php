@@ -5,10 +5,14 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
+use Modules\Core\Casts\WhereClause;
 use Modules\Core\Enums\AggregateErrorCode;
 use Modules\Core\Exceptions\AggregateException;
+use Modules\Core\Inspector\SchemaInspector;
 use Modules\Core\Models\ACL;
 use Modules\Core\Models\Permission;
 use Modules\Core\Models\Role;
@@ -21,6 +25,7 @@ use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Tests\Stubs\Crud\AggregateOrderStubModel;
 use Modules\Core\Tests\Stubs\Crud\AggregateRestrictedOrderStubModel;
+use Modules\Core\Tests\Stubs\Crud\DynamicOnlyStubModel;
 use Modules\Core\Tests\Support\AggregateTestKit;
 
 beforeEach(function (): void {
@@ -52,6 +57,20 @@ function aggregate_totals_refusal(array $request, ?Model $model = null): Aggrega
 {
     try {
         aggregate_totals($request, model: $model);
+    } catch (AggregateException $exception) {
+        return $exception;
+    }
+
+    throw new RuntimeException('The aggregate request was not refused.');
+}
+
+/**
+ * The refusal of a count over the rows the filters keep, which the service must not run.
+ */
+function aggregate_totals_filter_refusal(FiltersGroup $filters, Model $model): AggregateException
+{
+    try {
+        aggregate_totals(['measures' => [['fn' => 'count']]], $filters, $model);
     } catch (AggregateException $exception) {
         return $exception;
     }
@@ -207,6 +226,53 @@ it('a column the user cannot read is UNREADABLE_FIELD', function (array $request
     'a measure field' => [['measures' => [['fn' => 'sum', 'field' => 'total']]], 'measures.0.field'],
     'a group field' => [['group_by' => ['field' => 'total']], 'group_by.field'],
     'a period field' => [['period' => ['field' => 'total', 'preset' => 'this_month']], 'period.field'],
+]);
+
+it('a filter on a column the user cannot read is UNREADABLE_FIELD', function (FiltersGroup $filters, string $field): void {
+    $refusal = aggregate_totals_filter_refusal($filters, new AggregateRestrictedOrderStubModel);
+
+    expect($refusal->errorCode)->toBe(AggregateErrorCode::UnreadableField)
+        ->and($refusal->field)->toBe($field);
+})->with([
+    'a column' => [new FiltersGroup([new Filter('status', 'paid'), new Filter('total', '10')]), 'filters.total'],
+    'a column in a nested group' => [
+        new FiltersGroup([new Filter('status', 'paid'), new FiltersGroup([new Filter('quantity', 1), new Filter('total', '10')], WhereClause::Or)]),
+        'filters.total',
+    ],
+    'a relation path' => [new FiltersGroup([new Filter('customer.name', 'Ada')]), 'filters.customer.name'],
+]);
+
+it('a filter on an unknown column is INVALID_FIELD', function (string $property, Model $model): void {
+    $refusal = aggregate_totals_filter_refusal(new FiltersGroup([new Filter($property, 'x')]), $model);
+
+    expect($refusal->errorCode)->toBe(AggregateErrorCode::InvalidField)
+        ->and($refusal->field)->toBe('filters.' . $property);
+})->with([
+    'a column' => ['no_such_column', new AggregateOrderStubModel],
+    'a column the caller could not read either' => ['no_such_column', new AggregateRestrictedOrderStubModel],
+    'a json path of no column' => ['no_such_column->key', new AggregateOrderStubModel],
+]);
+
+it('a filter on a property stored outside the columns still narrows the totals', function (string $property): void {
+    Schema::create('dynamic_only_stub', function (Blueprint $table): void {
+        $table->id();
+        $table->string('name');
+        $table->json('components')->nullable();
+        $table->unsignedBigInteger('entity_id')->nullable();
+        $table->unsignedBigInteger('presettable_id')->nullable();
+    });
+    SchemaInspector::getInstance()->clearTable('dynamic_only_stub');
+    DynamicOnlyStubModel::query()->insert([
+        ['name' => 'Red thing', 'components' => json_encode(['color' => 'red'])],
+        ['name' => 'Blue thing', 'components' => json_encode(['color' => 'blue'])],
+    ]);
+
+    $result = aggregate_totals(['measures' => [['fn' => 'count']]], new FiltersGroup([new Filter($property, 'red')]), new DynamicOnlyStubModel);
+
+    expect($result->total)->toBe(['count' => 1]);
+})->with([
+    'a dynamic field' => ['color'],
+    'a json path of a column' => ['components->color'],
 ]);
 
 it('holds a query built without its validator to max_measures', function (): void {
