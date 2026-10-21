@@ -97,19 +97,19 @@ HTTP Request
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/select/{entity}` | GET, POST | List records with filtering/pagination |
-| `/api/v1/detail/{entity}` | GET | Get single record by primary key |
-| `/api/v1/history/{entity}` | GET | Get record with version history (needs `update` or `approve` on the entity) |
-| `/api/v1/tree/{entity}` | GET | Get hierarchical record (ancestors/descendants) |
+| `/api/v1/select/{module}/{entity}` | GET, POST | List records with filtering/pagination |
+| `/api/v1/detail/{module}/{entity}` | GET | Get single record by primary key |
+| `/api/v1/history/{module}/{entity}` | GET | Get record with version history (needs `update` or `approve` on the entity) |
+| `/api/v1/tree/{module}/{entity}` | GET | Get hierarchical record (ancestors/descendants) |
 | `/api/v1/aggregate/{module}/{entity}` | GET, POST | Counts, sums, averages, minima and maxima, by group or time bucket (see [Aggregate Route](#aggregate-route)) |
 
 ### Write Operations
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/insert/{entity}` | POST | Create new record |
-| `/api/v1/update/{entity}` | PATCH | Update existing record(s) |
-| `/api/v1/delete/{entity}` | DELETE | Hard delete record(s) |
+| `/api/v1/insert/{module}/{entity}` | POST | Create new record |
+| `/api/v1/update/{module}/{entity}` | PATCH | Update existing record(s) |
+| `/api/v1/delete/{module}/{entity}` | DELETE | Hard delete record(s) |
 
 #### Relation sync on update
 
@@ -813,7 +813,7 @@ class Article extends Model
 }
 ```
 
-Access via `/api/v1/history/{entity}`.
+Access via `/api/v1/history/{module}/{entity}`.
 
 ### HasRecursiveRelationships (Tree)
 
@@ -826,7 +826,7 @@ class Category extends Model
 }
 ```
 
-Access via `/api/v1/tree/{entity}` with `parents` and/or `children` parameters.
+Access via `/api/v1/tree/{module}/{entity}` with `parents` and/or `children` parameters.
 
 ### HasLocks (Locking)
 
@@ -1161,11 +1161,13 @@ The examples below use an illustrative `shop/orders` entity with the columns `st
 | `measures` | Required list of 1 to `max_measures` objects `{ "fn", "field"? }`. `fn` is `count`, `sum`, `avg`, `min` or `max`. `field` is a column of the entity itself and may be left out only for `count`, which then counts rows. A dotted field is refused (no measure on a related entity) and so is a figure asked twice. A measure is named `count` or `<fn>_<field>` in the result: `sum_total`, `count_total`. |
 | `group_by` | Optional, one dimension `{ "field", "bucket"?, "label"? }`: an own column; a column one `BelongsTo` hop away (`customer.country`), which is its own label; a foreign-key column with `label` naming a relation column (`customer_id` with `customer.name`); or a date column with `bucket` (`day`, `week`, `month`, `quarter`, `year`). |
 | `period` | `{ "field", ... }` over a date column of the entity, with exactly one of `last: { "n", "unit" }`, `preset`, or `from` with `to` ([periods](#aggregate-periods-and-time-zone)). |
-| `filters` | The list vocabulary: conditions, nested AND/OR groups and [model scopes](#scope-filters-in-requests). |
+| `filters` | The list vocabulary, see [Filters](#filters): conditions, nested AND/OR groups, relation filters and [model scopes](#scope-filters-in-requests). |
 | `sort` | `{ "by": "measure" \| "key", "dir": "asc" \| "desc" }`; `measure` is the first measure. `by` defaults to `key` for a bucketed group and to `measure` otherwise, and `dir` to `asc` for `key` and `desc` for `measure`. |
 | `limit` | Show only the first N groups of a column (at least 1, at most `max_groups`). |
 | `other` | `true` with a `limit`: add the figures of the groups left out. |
 | `compare` | `"previous_period"` (or `true`): add the figures of the previous period. Needs a `period`. |
+
+A `POST` body, the request behind the first result example below:
 
 ```json
 {
@@ -1227,9 +1229,9 @@ with it, so a request is refused the same way wherever it comes from.
   `min` or `max` of a date column is the text the database stores (`"2026-01-15 12:00:00"`). `null` is a figure no row
   gave (`sum`, `avg`, `min`, `max` over no value) or one a [mixed currency](#aggregate-currency) took away.
 - `data.total` is the figures of every row the request covers, not only of the groups shown.
-- `data.other` is flat, `{ <measure names>..., "groups": N }`, and is present only when `other` was asked and some
-  groups were left out. It is computed by the database over the rest of the rows, so the average of the rest is a
-  real average, not derived from the groups shown.
+- `data.other` is flat, `{ <measure names>..., "groups": N }` with `N` the number of groups left out, and is present
+  only when `other` was asked and some groups were left out. It is computed by the database over the rest of the
+  rows, so the average of the rest is a real average, not derived from the groups shown.
 - `data.compare` is present only when `compare` was asked: `{ total }`, and `series` too for a bucketed request.
 - `meta.row_count` is the number of rows behind `total`. `meta.group_count` is the number of groups (the buckets of
   a bucketed request, `0` with no group). `meta.truncated` is true when groups were left out of `series`, whether or
@@ -1251,7 +1253,10 @@ with it, so a request is refused the same way wherever it comes from.
 - **A foreign-key column with `label`** (`{ "field": "customer_id", "label": "customer.name" }`) keys the groups by
   the key and labels the groups shown in one bounded read, under the permission and ACL of the related entity. The
   label is a column of the `BelongsTo` whose foreign key is the group field, or of a label source the model declares
-  (`ProvidesFacetLabelSources`, translated labels included). A label the caller cannot read falls back to the key.
+  (`ProvidesFacetLabelSources`, translated labels included). A group whose related row the related ACL hides, that has
+  no related row, or whose label is `null`, is labelled with its key (as text). The permission rule is the one above:
+  no `select` on the related entity is refused, and a label column the caller may not read is `UNREADABLE_FIELD` on
+  `group_by.label`.
 - **Order.** `sort.by = key` orders by the value, with the `null` group last in both directions. `sort.by = measure`
   orders by the first measure, ties broken by key ascending with the `null` group after the groups it ties with. A
   group whose first measure is `null` sits where the database puts a null.
@@ -1298,8 +1303,8 @@ mid-month gets the month bucket keyed by the first of that month), but only the 
 **Comparison.** `compare: "previous_period"` adds the figures of the period of the same length immediately before.
 A period of whole calendar months (it starts on the first day of a month and ends on the last day of a month) shifts by
 that many months: `last_month` is the month before, `this_quarter` the quarter before. Any other period shifts by its own
-length in days: a partial `last 12 months` compares with the 354 days before it, never with twelve months nobody asked
-for.
+length in days: a partial `last 12 months` (from the first day of a month eleven months back to today, 354 days on
+2026-10-20) compares with as many days immediately before it, never with twelve months nobody asked for.
 
 - `data.compare.total` always exists. `data.compare.series` exists only for a bucketed request and is built by the same
   rules (every bucket filled), but is **always chronological**, whatever the sort of `series`.
@@ -1363,8 +1368,10 @@ is `INVALID_FIELD`, a column the caller cannot read is `UNREADABLE_FIELD`.
 ### Aggregate currency
 
 `Support\CurrencyColumns` pairs an amount with its currency by name: an amount `<x>_<suffix>` takes the column
-`currency_<suffix>` when the table has it, and otherwise the column `currency`. A field with no underscore is paired
-by its whole name (`total` takes `currency_total`, then `currency`). A table with neither has no currency to check.
+`currency_<suffix>` when the table has it, and otherwise the column `currency`. The suffix is the text after the last
+underscore: `unit_price` is paired with `currency_price` and `total_net_amount` with `currency_amount`. A field with no
+underscore is paired by its whole name (`total` takes `currency_total`, then `currency`). A table with neither has no
+currency to check.
 
 Only `sum`, `avg`, `min` and `max` over a numeric column that is not a key, on a table that has a paired currency
 column, are amounts. The rule is by type, not by meaning: a `sum(quantity)` on a table with a `currency` column is
@@ -1374,8 +1381,9 @@ treated as an amount too (a known false positive), while `count`, dates and keys
   of the previous period alike. One warning per measure, however many cells mix, goes to `meta.warnings` as
   `{ "code": "MIXED_CURRENCY", "field": "<measure name>", "message": "..." }`, and `meta.currencies` lists the
   currencies of the rows of the result (at most 20, ascending) when its total is mixed. `meta.currency` is absent.
-- A cell with one currency keeps its value. When the whole result has one currency, and no cell mixes,
-  `meta.currency` carries it.
+- A cell with one currency keeps its value. When the whole result, the previous period of a comparison included, has
+  one currency and no cell mixes, `meta.currency` carries it. A previous period in a single currency other than the
+  current one leaves `meta.currency` out, with no warning, since the result then names two currencies.
 - `null` and the **empty string** are not currencies: rows with one of them are ignored like `NULL`, a cell with one
   currency beside such rows keeps its value, and a cell with only such rows has no currency. Values are not trimmed: a
   value of spaces still counts as a currency, and a padded `'EUR '` next to `'EUR'` counts as two.
@@ -1417,9 +1425,9 @@ switches a limit off. The ceilings are checked before any query runs, except the
 | --- | --- | --- |
 | `max_measures` | `3` | Measures one request may hold. More is `INVALID_FIELD` on `measures`. |
 | `max_groups` | `50` | Groups of a column one request may show. A `limit` above it is `TOO_MANY_GROUPS` on `limit`; with no `limit`, a grouping that gives more groups is `TOO_MANY_GROUPS` on `group_by.field`. |
-| `max_points` | `400` | Buckets of one series, the previous period's series included. More is `PERIOD_TOO_LONG` on `group_by.bucket`, and the message names a coarser bucket that fits or asks for a shorter period. |
+| `max_points` | `400` | Buckets of one series. The series of the period and, with `compare`, the series of the previous period are each held to it, so a result can hold up to twice this many. More is `PERIOD_TOO_LONG` on `group_by.bucket`, and the message names a coarser bucket that fits or asks for a shorter period. |
 | `max_period_days` | `1096` | Days of the requested period, both ends counted. More is `PERIOD_TOO_LONG` on `period`. The previous period is not measured by it. |
-| `max_objects_per_message` | `6` | Not read by the route. It caps the objects the in-app assistant may show in one message; it is only carried by `AggregateLimits` (no consumer yet). |
+| `max_objects_per_message` | `6` | Reserved: nothing reads it yet. The route ignores it; `AggregateLimits` carries it for a later consumer. |
 | `rate_per_minute` | `60` | Requests a minute to the route, per user. |
 
 The rate is a named limiter, `aggregate`, defined next to the `api` limiter in `CoreServiceProvider` and attached by
@@ -1433,8 +1441,9 @@ There is no hard timeout in v1: the code `TIMEOUT` is reserved and never emitted
 ### Aggregate errors
 
 A refusal of the contract is a `422` with `{ "error": { "code", "message", "field"? } }`. `field` is the path of the part
-of the request that caused it: `measures.0.fn`, `measures.1.field`, `group_by.field`, `group_by.bucket`, `group_by.label`,
-`period`, `period.field`, `sort.by`, `limit`, `other`, `compare`, `filters.<property>`.
+of the request that caused it, for example `measures`, `measures.0.fn`, `measures.1.field`, `group_by`, `group_by.field`,
+`group_by.bucket`, `group_by.label`, `period`, `period.field`, `sort`, `sort.by`, `sort.dir`, `limit`, `other`, `compare`,
+`filters`, `filters.<property>`. The other answers (`403`, `401`, `429`, `500`) have bodies of their own, listed below.
 
 | Code | When |
 | --- | --- |
@@ -1455,7 +1464,9 @@ Other answers:
   (a translated or a dynamic field) still narrows the figures. A dotted path is checked for readability only: an
   unknown column at its end is not refused up front, as in the list. A scope filter the list refuses (an undeclared
   scope, for instance) is `INVALID_FIELD` on `filters`.
-- **`403` and `401`.** A missing `select` permission, or a related entity the caller may not select.
+- **`403` and `401`.** A missing `select` permission, or a related entity the caller may not select (a relation group, a
+  label, a relation in `filters`). The body is the refusal body of the list, not the envelope: `error` is a string and
+  `data` is `[]`.
 - **An `InvalidArgumentException`** from the list machinery (its guards name fields, never SQL) is `422` `INVALID_FIELD`
   with its message and no `field`, and is logged at notice level (`Aggregate request refused`, with the exception
   class, message, module and entity).
@@ -1463,7 +1474,7 @@ Other answers:
   at error level. A client fault is not logged.
 - **`500`.** Any other failure answers `{ "error": { "message": "The aggregate could not be computed." } }`, with no
   exception text (a failed query's message holds its SQL) whatever `app.debug` says. The exception is reported.
-- **`429`.** Over the rate, as above.
+- **`429`.** Over the rate, as above. The body is Laravel's default `{ "message" }`, outside the envelope.
 
 ### Aggregate database support
 
