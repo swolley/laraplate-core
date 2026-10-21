@@ -111,6 +111,17 @@ it('reads the cast before the schema type', function (string $cast, ColumnKind $
     'array' => ['array', ColumnKind::Other],
 ]);
 
+it('a temporal cast on a column of a numeric schema type is other', function (string $column, string $cast): void {
+    $order = new AggregateOrderStubModel;
+    $order->mergeCasts([$column => $cast]);
+
+    expect(ColumnKinds::of($order, $column))->toBe(ColumnKind::Other);
+})->with([
+    'unix seconds cast as timestamp' => ['quantity', 'timestamp'],
+    'an integer cast as datetime' => ['quantity', 'datetime'],
+    'a decimal cast as immutable date' => ['total', 'immutable_date'],
+]);
+
 it('maps the declared type of a column by its name', function (string $declared, ColumnKind $kind): void {
     DB::statement(sprintf('create table aggregate_typed (probe %s)', $declared));
     SchemaInspector::getInstance()->clearTable('aggregate_typed');

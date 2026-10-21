@@ -16,8 +16,9 @@ use Modules\Core\Inspector\SchemaInspector;
  * Whether a column of a model is numeric, temporal or neither, and whether it is a key: what the aggregate
  * checks before it builds a measure, a period or a bucket on the column.
  *
- * The cast of the model decides first. A column whose cast says nothing about its kind is read by its schema
- * type: the first attribute the inspector keeps for a column, its `type_name`. `Column::$type` cannot serve,
+ * The cast of the model decides first, except that a numeric schema type overrides a temporal cast. A column whose
+ * cast says nothing about its kind is read by its schema type: the first attribute the inspector keeps for a column,
+ * its `type_name`. `Column::$type` cannot serve,
  * because it is the Doctrine name of the raw type and a `numeric` or `double precision` column has none. The
  * name is lower-cased and cut of its precision and `unsigned` before it is mapped, so `decimal(15,4)` is
  * `decimal`.
@@ -52,22 +53,28 @@ final class ColumnKinds
 
     /**
      * A key is still numeric here: {@see self::isKey()} is what keeps it from being summed.
+     *
+     * A temporal cast on a column the schema stores as a number (unix seconds cast as `timestamp`) is neither
+     * temporal nor numeric: the database reads its values as numbers, so the day of a value and the date bounds of
+     * a period would mean nothing, and its figures are not amounts.
      */
     public static function of(Model $model, string $column): ColumnKind
     {
         $cast = $model->getCasts()[$column] ?? null;
+        $cast_kind = is_string($cast) ? self::kindOfCast($cast) : ColumnKind::Other;
 
-        if (is_string($cast)) {
-            $kind = self::kindOfCast($cast);
-
-            if ($kind !== ColumnKind::Other) {
-                return $kind;
-            }
+        if ($cast_kind === ColumnKind::Numeric) {
+            return $cast_kind;
         }
 
         $inspected = SchemaInspector::getInstance()->column($column, $model->getTable(), $model->getConnectionName());
+        $schema_kind = $inspected instanceof Column ? self::kindOfSchemaType($inspected) : ColumnKind::Other;
 
-        return $inspected instanceof Column ? self::kindOfSchemaType($inspected) : ColumnKind::Other;
+        if ($cast_kind === ColumnKind::Temporal) {
+            return $schema_kind === ColumnKind::Numeric ? ColumnKind::Other : $cast_kind;
+        }
+
+        return $schema_kind;
     }
 
     /**

@@ -378,6 +378,29 @@ it('a period or bucket field that is not temporal is INVALID_FIELD', function (a
     ], 'group_by.field'],
 ]);
 
+it('an integer column cast as a timestamp is neither a date nor a number', function (array $request, array $error): void {
+    $order = new AggregateOrderStubModel;
+    $order->mergeCasts(['quantity' => 'timestamp']);
+
+    expect(fn (): AggregateResult => aggregate_buckets($request, model: $order))
+        ->toThrow(function (AggregateException $exception) use ($error): void {
+            expect([$exception->errorCode->value, $exception->field])->toBe($error);
+        });
+})->with([
+    'a period on it' => [
+        ['measures' => [['fn' => 'count']], 'period' => ['field' => 'quantity', 'preset' => 'this_month']],
+        ['INVALID_FIELD', 'period.field'],
+    ],
+    'a bucket on it' => [[
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'quantity', 'bucket' => 'month'],
+        'period' => ['field' => 'quantity', 'preset' => 'this_month'],
+    ], ['INVALID_FIELD', 'group_by.field']],
+    'min of it' => [['measures' => [['fn' => 'min', 'field' => 'quantity']]], ['NOT_MEASURABLE', 'measures.0.field']],
+    'max of it' => [['measures' => [['fn' => 'max', 'field' => 'quantity']]], ['NOT_MEASURABLE', 'measures.0.field']],
+    'sum of it' => [['measures' => [['fn' => 'sum', 'field' => 'quantity']]], ['NOT_MEASURABLE', 'measures.0.field']],
+]);
+
 it('a bucket on a field other than the period field is INVALID_FIELD', function (): void {
     Schema::table('aggregate_orders', function (Blueprint $table): void {
         $table->dateTime('shipped_at')->nullable();
