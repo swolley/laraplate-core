@@ -266,19 +266,26 @@ final class AggregateEngine
      * One query grouped by the column: the measures of each group, in the order of the sort (by the first
      * measure, the key breaking ties, or by the key), and no more groups than the limit.
      *
+     * The null group comes after the others in either direction of a sort by key, and after the groups it ties
+     * with on a sort by measure. Where a driver puts a null on its own (first on SQLite and MySQL, last on
+     * PostgreSQL) would otherwise decide whether a limit shows the null group or folds it into the rest.
+     *
      * @throws AggregateException
      *
      * @return list<array{key: mixed, values: array<string, int|float|string|null>}>
      */
     private function groupRows(Model $model, BaseQueryBuilder $rows, string $column, AggregateQuery $query, CurrencyCheck $currency): array
     {
-        $rows->select([$column . ' as ' . self::GROUP_KEY_ALIAS, ...MeasureSql::select($model, $rows->getGrammar(), $query->measures, $currency)])
+        $grammar = $rows->getGrammar();
+        $null_last = 'case when ' . $grammar->wrap($column) . ' is null then 1 else 0 end';
+
+        $rows->select([$column . ' as ' . self::GROUP_KEY_ALIAS, ...MeasureSql::select($model, $grammar, $query->measures, $currency)])
             ->groupBy($column);
 
         if ($query->sortBy === 'key') {
-            $rows->orderBy($column, $query->sortDir);
+            $rows->orderByRaw($null_last)->orderBy($column, $query->sortDir);
         } else {
-            $rows->orderBy(MeasureSql::alias(0), $query->sortDir)->orderBy($column);
+            $rows->orderBy(MeasureSql::alias(0), $query->sortDir)->orderByRaw($null_last)->orderBy($column);
         }
 
         if ($query->limit !== null) {

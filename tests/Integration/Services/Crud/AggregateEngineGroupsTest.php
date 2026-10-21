@@ -106,6 +106,62 @@ it('orders by key ascending when asked', function (): void {
     expect(array_column($result->series, 'key'))->toBe(['new', 'paid', 'shipped']);
 });
 
+it('the null group comes last when sorted by key, in both directions', function (string $dir, array $keys): void {
+    AggregateTestKit::seedOrders([['currency' => 'USD'], ['currency' => null], ['currency' => 'EUR'], ['currency' => 'GBP']]);
+
+    $result = aggregate_groups([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'currency'],
+        'sort' => ['by' => 'key', 'dir' => $dir],
+    ]);
+
+    expect(array_column($result->series, 'key'))->toBe($keys);
+})->with([
+    'ascending' => ['asc', ['EUR', 'GBP', 'USD', null]],
+    'descending' => ['desc', ['USD', 'GBP', 'EUR', null]],
+]);
+
+it('a limit by key folds the null group into the rest', function (string $dir, array $keys): void {
+    AggregateTestKit::seedOrders([
+        ['currency' => null], ['currency' => null], ['currency' => null],
+        ['currency' => 'EUR'], ['currency' => 'USD'], ['currency' => 'USD'],
+    ]);
+
+    $result = aggregate_groups([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'currency'],
+        'sort' => ['by' => 'key', 'dir' => $dir],
+        'limit' => 2,
+        'other' => true,
+    ]);
+
+    expect(array_column($result->series, 'key'))->toBe($keys)
+        ->and($result->other)->toBe(['count' => 3, 'groups' => 1]);
+})->with([
+    'ascending' => ['asc', ['EUR', 'USD']],
+    'descending' => ['desc', ['USD', 'EUR']],
+]);
+
+it('ties on the measure break by key, the null group last', function (string $dir, array $keys): void {
+    AggregateTestKit::seedOrders([
+        ['currency' => 'USD'], ['currency' => 'USD'],
+        ['currency' => null], ['currency' => null],
+        ['currency' => 'EUR'], ['currency' => 'EUR'],
+        ['currency' => 'GBP'],
+    ]);
+
+    $result = aggregate_groups([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'currency'],
+        'sort' => ['by' => 'measure', 'dir' => $dir],
+    ]);
+
+    expect(array_column($result->series, 'key'))->toBe($keys);
+})->with([
+    'descending' => ['desc', ['EUR', 'USD', null, 'GBP']],
+    'ascending' => ['asc', ['GBP', 'EUR', 'USD', null]],
+]);
+
 it('a null group has key null and no label', function (): void {
     $ada = aggregate_groups_customer('Ada');
     AggregateTestKit::seedOrders([
