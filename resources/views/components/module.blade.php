@@ -7,14 +7,19 @@
 	@endif
 
 	<div class="w-full flex flex-col h-full">
-		<div class="flex items-center justify-between mb-2">
-			<h3 class="text-lg font-semibold text-black dark:text-white">{{ $module }}</h3>
-			<span class="text-xs text-gray-500 dark:text-gray-400">{{ $data['version'] ?? 'N/A' }}</span>
-		</div>
+		<div class="flex items-start justify-between gap-4 mb-4">
+			<div class="flex flex-col gap-1 min-w-0">
+				<div class="flex items-baseline justify-between gap-3">
+					<h3 class="text-lg font-semibold text-black dark:text-white">{{ $module }}</h3>
+					<span class="text-xs text-gray-500 dark:text-gray-400">{{ $data['version'] ?? 'N/A' }}</span>
+				</div>
 
-		@if(isset($data['description']))
-			<p class="text-sm text-gray-600 dark:text-gray-300 mb-4">{{ $data['description'] }}</p>
-		@endif
+				@if(isset($data['description']))
+					<p class="text-sm text-gray-600 dark:text-gray-300">{{ $data['description'] }}</p>
+				@endif
+			</div>
+			<img class="w-12 h-12 shrink-0 ml-4 mr-2" src="{{ rtrim((string) config('app.brand_icons'), '/') }}/{{ $module === 'App' ? 'laraplate' : Str::lower($module) }}.svg" alt="" />
+		</div>
 
 		<div class="my-4 text-sm/relaxed flex grow">
 			{{-- models --}}
