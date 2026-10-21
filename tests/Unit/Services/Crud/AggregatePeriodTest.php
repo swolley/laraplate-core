@@ -172,6 +172,15 @@ it('shifts by days on the calendar across a change of the clock', function (): v
         ->and($previous->to->format('Y-m-d H:i:s'))->toBe('2026-10-25 00:00:00');
 });
 
+it('names the units of last when it refuses one', function (): void {
+    $resolve = static fn (): AggregatePeriod => AggregatePeriod::resolve(
+        ['field' => 'created_at', 'last' => ['n' => 2, 'unit' => 'fortnight']],
+        CarbonImmutable::parse('2026-10-20', 'UTC'),
+    );
+
+    expect($resolve)->toThrow(AggregateException::class, 'one of day, week, month, quarter, year');
+});
+
 it('lists the buckets from the one of the first day to the one of the last', function (TimeBucket $bucket, array $spec, array $expected): void {
     $period = AggregatePeriod::resolve(['field' => 'created_at', ...$spec], CarbonImmutable::parse('2026-10-20', 'UTC'));
 

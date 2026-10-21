@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Http\Requests;
 
+use Closure;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Support\Arr;
 use Modules\Core\Casts\ListRequestData;
@@ -24,7 +25,9 @@ use Override;
  *
  * The rules check the shape of what arrives, and {@see AggregateQuery} the contract: a function or a bucket
  * the contract does not know is refused there, with its own code, not here as a plain shape error. Every
- * failure of the validation is an {@see AggregateException}, so every error of the route is structured.
+ * failure of the validation is an {@see AggregateException}. That is not every error the request can raise:
+ * {@see self::parsed()} builds a {@see ListRequestData}, which can still throw a ValidationException (a
+ * malformed scope filter) outside {@see self::failedValidation()}, and the caller has to map it.
  */
 final class AggregateRequest extends ListRequest
 {
@@ -34,9 +37,10 @@ final class AggregateRequest extends ListRequest
     private const array AGGREGATE_KEYS = ['measures', 'group_by', 'sort', 'period', 'limit', 'other', 'compare'];
 
     /**
-     * The keys a GET caller sends as a JSON string.
+     * The keys a GET caller sends as a JSON string and that {@see ListRequest} does not decode: it decodes
+     * `sort` and `group_by` itself, with the other keys of its vocabulary.
      */
-    private const array JSON_KEYS = ['measures', 'group_by', 'period', 'sort'];
+    private const array JSON_KEYS = ['measures', 'period'];
 
     /**
      * The keys a GET caller sends as text and that the contract reads as true or false.
@@ -55,16 +59,16 @@ final class AggregateRequest extends ListRequest
 
         return [
             ...$rules,
-            'measures' => ['required', 'array', 'min:1'],
+            'measures' => ['required', 'array', 'list', 'min:1', 'max:' . AggregateLimits::fromConfig()->maxMeasures],
             'measures.*' => ['array'],
             'measures.*.fn' => ['required', 'string'],
             'measures.*.field' => ['nullable', 'string'],
-            'group_by' => ['sometimes', 'nullable', 'array'],
+            'group_by' => ['sometimes', 'nullable', 'array', self::objectRule('{field, bucket?, label?}')],
             'group_by.field' => ['required_with:group_by', 'string'],
             'group_by.bucket' => ['nullable', 'string'],
             'group_by.label' => ['nullable', 'string'],
             'period' => ['sometimes', 'nullable', 'array'],
-            'sort' => ['sometimes', 'nullable', 'array'],
+            'sort' => ['sometimes', 'nullable', 'array', self::objectRule('{by, dir}')],
             'sort.by' => ['string'],
             'sort.dir' => ['string'],
             'limit' => ['sometimes', 'nullable', 'integer', 'min:1'],
@@ -127,6 +131,23 @@ final class AggregateRequest extends ListRequest
         $keys = $errors->keys();
 
         throw new AggregateException(AggregateErrorCode::InvalidField, $errors->first(), isset($keys[0]) ? (string) $keys[0] : null);
+    }
+
+    /**
+     * A rule that refuses a list where the aggregate wants an object. The list vocabulary has a `group_by` and a
+     * `sort` that are lists (and the list request splits a text such as `sort=key` into one), and the framework
+     * keeps of an array only the keys that have a rule of their own, so a list would be dropped without a word
+     * and the request would run with the default.
+     *
+     * @return Closure(string, mixed, Closure): void
+     */
+    private static function objectRule(string $shape): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail) use ($shape): void {
+            if (is_array($value) && $value !== [] && array_is_list($value)) {
+                $fail(sprintf('The %s field must be an object %s.', $attribute, $shape));
+            }
+        };
     }
 
     /**

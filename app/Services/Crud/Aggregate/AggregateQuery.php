@@ -33,9 +33,13 @@ final readonly class AggregateQuery
     private const string COMPARE_PREVIOUS_PERIOD = 'previous_period';
 
     /**
-     * The greatest whole number read from text or from a float: a larger one is not a count or a limit anyone
-     * asks for, and a float that large does not cast to an integer.
+     * The digits of the greatest whole number read as it is. A text of digits with more of them, or a float as
+     * large as that, is read as the greatest integer: it is not a count or a limit anyone asks for, a float that
+     * large does not cast to an integer, and the check that follows (the limit of groups, the count of a period)
+     * refuses it for being too large, not for being malformed.
      */
+    private const int MAX_WHOLE_DIGITS = 15;
+
     private const float MAX_WHOLE_NUMBER = 1.0E15;
 
     /**
@@ -81,6 +85,10 @@ final readonly class AggregateQuery
 
         if ($other && $limit === null) {
             throw self::invalid('other', 'The rest of the groups is shown after a limit: give a limit.');
+        }
+
+        if ($limit !== null && (! $group instanceof AggregateGroup || $bucketed)) {
+            throw self::invalid('limit', 'A limit applies to the groups of a column: group by a column that is not a time bucket.');
         }
 
         [$sortBy, $sortDir] = self::sort($input['sort'] ?? null, $bucketed);
@@ -164,9 +172,17 @@ final readonly class AggregateQuery
         }
 
         $measures = [];
+        $names = [];
 
-        foreach ($value as $index => $measure) {
-            $measures[] = self::measure($measure, 'measures.' . $index);
+        foreach ($value as $index => $item) {
+            $measure = self::measure($item, 'measures.' . $index);
+
+            if (isset($names[$measure->name()])) {
+                throw self::invalid('measures.' . $index, 'A measure repeats an earlier one: each figure is asked for once.');
+            }
+
+            $names[$measure->name()] = true;
+            $measures[] = $measure;
         }
 
         return $measures;
@@ -184,6 +200,8 @@ final readonly class AggregateQuery
             throw self::invalid($path . '.fn', 'A measure names its function.');
         }
 
+        self::assertUtf8($fn, $path . '.fn');
+
         if (! in_array($fn, self::FUNCTIONS, true)) {
             throw new AggregateException(
                 AggregateErrorCode::UnsupportedFunction,
@@ -196,6 +214,10 @@ final readonly class AggregateQuery
 
         if ($field !== null && (! is_string($field) || $field === '')) {
             throw self::invalid($path . '.field', 'The field of a measure is the name of a column.');
+        }
+
+        if (is_string($field)) {
+            self::assertUtf8($field, $path . '.field');
         }
 
         if ($field === null && $fn !== 'count') {
@@ -211,12 +233,14 @@ final readonly class AggregateQuery
             return null;
         }
 
-        $group = self::associative($value, 'group_by');
+        $group = self::associative($value, 'group_by', '{field, bucket?, label?}');
         $field = $group['field'] ?? null;
 
         if (! is_string($field) || $field === '') {
             throw self::invalid('group_by.field', 'The group names the field it groups by.');
         }
+
+        self::assertUtf8($field, 'group_by.field');
 
         $bucket = null;
 
@@ -224,7 +248,7 @@ final readonly class AggregateQuery
             $bucket = is_string($group['bucket']) ? TimeBucket::fromInput($group['bucket']) : null;
 
             if (! $bucket instanceof TimeBucket) {
-                throw self::invalid('group_by.bucket', 'The bucket of a group is one of ' . self::bucketNames() . '.');
+                throw self::invalid('group_by.bucket', 'The bucket of a group is one of ' . implode(', ', TimeBucket::names()) . '.');
             }
         }
 
@@ -232,6 +256,14 @@ final readonly class AggregateQuery
 
         if ($label !== null && (! is_string($label) || $label === '')) {
             throw self::invalid('group_by.label', 'The label of a group is the name of a relation column.');
+        }
+
+        if (is_string($label)) {
+            self::assertUtf8($label, 'group_by.label');
+        }
+
+        if ($bucket instanceof TimeBucket && $label !== null) {
+            throw self::invalid('group_by.label', 'A group by a time bucket has no label: its key is a date.');
         }
 
         return new AggregateGroup($field, $bucket, $label);
@@ -249,7 +281,12 @@ final readonly class AggregateQuery
             return null;
         }
 
-        $period = self::associative($value, 'period');
+        $period = self::associative($value, 'period', '{field, and one of last, preset or from with to}');
+
+        if (is_string($period['field'] ?? null)) {
+            self::assertUtf8($period['field'], 'period.field');
+        }
+
         $last = $period['last'] ?? null;
 
         if (is_array($last) && isset($last['n'])) {
@@ -337,7 +374,7 @@ final readonly class AggregateQuery
      */
     private static function sort(mixed $value, bool $bucketed): array
     {
-        $sort = $value === null || $value === [] ? [] : self::associative($value, 'sort');
+        $sort = $value === null || $value === [] ? [] : self::associative($value, 'sort', '{by, dir}');
 
         $by = $sort['by'] ?? ($bucketed ? 'key' : 'measure');
 
@@ -356,14 +393,15 @@ final readonly class AggregateQuery
 
     /**
      * A part of the request that is an object: a list is the list vocabulary of another request, such as the
-     * `group_by` and `sort` of a list, and is refused.
+     * `group_by` and `sort` of a list (or a text the list request split into one), and is refused with the
+     * shape the part has.
      *
      * @return array<array-key, mixed>
      */
-    private static function associative(mixed $value, string $path): array
+    private static function associative(mixed $value, string $path, string $shape): array
     {
         if (! is_array($value) || array_is_list($value)) {
-            throw self::invalid($path, sprintf('The "%s" of an aggregate is an object.', $path));
+            throw self::invalid($path, sprintf('The "%s" of an aggregate must be an object %s.', $path, $shape));
         }
 
         return $value;
@@ -371,19 +409,40 @@ final readonly class AggregateQuery
 
     /**
      * The integer a client wrote as text or as a float (`"12"`, `12.0`), which a query string and some JSON
-     * encoders send; anything else comes back as it is, for the caller to refuse.
+     * encoders send (a JSON number beyond the integers decodes to a float); anything else comes back as it is,
+     * for the caller to refuse. A text of digits of any length, or a float of that size, is the greatest
+     * integer, so that it is refused as too large.
      */
     private static function wholeNumber(mixed $value): mixed
     {
-        if (is_string($value) && preg_match('/^\d{1,15}$/D', $value) === 1) {
-            return (int) $value;
+        if (is_string($value) && preg_match('/^\d+$/D', $value) === 1) {
+            $digits = mb_ltrim($value, '0');
+
+            return mb_strlen($digits) > self::MAX_WHOLE_DIGITS ? PHP_INT_MAX : (int) $digits;
         }
 
-        if (is_float($value) && is_finite($value) && abs($value) < self::MAX_WHOLE_NUMBER && $value === floor($value)) {
-            return (int) $value;
+        if (is_float($value) && is_finite($value) && $value === floor($value)) {
+            if ($value >= self::MAX_WHOLE_NUMBER) {
+                return PHP_INT_MAX;
+            }
+
+            if ($value > -self::MAX_WHOLE_NUMBER) {
+                return (int) $value;
+            }
         }
 
         return $value;
+    }
+
+    /**
+     * @throws AggregateException With `INVALID_FIELD` on the path, when the text is not UTF-8: what is kept of a
+     *                            request must encode as JSON, and it is refused, not repaired.
+     */
+    private static function assertUtf8(string $value, string $path): void
+    {
+        if (! mb_check_encoding($value, 'UTF-8')) {
+            throw self::invalid($path, 'The value is not valid UTF-8 text.');
+        }
     }
 
     /**
@@ -403,11 +462,6 @@ final readonly class AggregateQuery
         }
 
         return $value;
-    }
-
-    private static function bucketNames(): string
-    {
-        return implode(', ', array_map(static fn (TimeBucket $bucket): string => $bucket->value, TimeBucket::cases()));
     }
 
     private static function invalid(string $field, string $message): AggregateException

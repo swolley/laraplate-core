@@ -10,6 +10,10 @@ it('has the five buckets of the contract', function (): void {
         ->toBe(['day', 'week', 'month', 'quarter', 'year']);
 });
 
+it('lists the names a client writes, in the order of the cases', function (): void {
+    expect(TimeBucket::names())->toBe(['day', 'week', 'month', 'quarter', 'year']);
+});
+
 it('reads a bucket from its name', function (string $value, TimeBucket $expected): void {
     expect(TimeBucket::fromInput($value))->toBe($expected);
 })->with([

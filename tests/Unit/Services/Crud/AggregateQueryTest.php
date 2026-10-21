@@ -248,7 +248,115 @@ it('refuses a request it cannot run', function (array $input, AggregateErrorCode
         ['measures' => [['fn' => 'count']], 'group_by' => ['field' => 'status'], 'sort' => ['measure']],
         AggregateErrorCode::InvalidField, 'sort',
     ],
+    'the same count twice' => [
+        ['measures' => [['fn' => 'count'], ['fn' => 'count']]],
+        AggregateErrorCode::InvalidField, 'measures.1',
+    ],
+    'the same sum twice, with another measure between' => [
+        ['measures' => [['fn' => 'sum', 'field' => 'total'], ['fn' => 'count'], ['fn' => 'sum', 'field' => 'total']]],
+        AggregateErrorCode::InvalidField, 'measures.2',
+    ],
+    'the same count over a field twice' => [
+        ['measures' => [['fn' => 'count', 'field' => 'status'], ['fn' => 'count', 'field' => 'status']]],
+        AggregateErrorCode::InvalidField, 'measures.1',
+    ],
+    'a label with a bucket' => [
+        [
+            'measures' => [['fn' => 'count']],
+            'group_by' => ['field' => 'ordered_at', 'bucket' => 'month', 'label' => 'customer.name'],
+            'period' => ['field' => 'ordered_at', 'preset' => 'this_year'],
+        ],
+        AggregateErrorCode::InvalidField, 'group_by.label',
+    ],
+    'a limit with no group' => [
+        ['measures' => [['fn' => 'count']], 'limit' => 5],
+        AggregateErrorCode::InvalidField, 'limit',
+    ],
+    'a limit with a bucketed group' => [
+        [
+            'measures' => [['fn' => 'count']],
+            'group_by' => ['field' => 'ordered_at', 'bucket' => 'month'],
+            'period' => ['field' => 'ordered_at', 'preset' => 'this_year'],
+            'limit' => 5,
+        ],
+        AggregateErrorCode::InvalidField, 'limit',
+    ],
+    'a function that is not UTF-8' => [
+        ['measures' => [['fn' => "su\xB1m", 'field' => 'total']]],
+        AggregateErrorCode::InvalidField, 'measures.0.fn',
+    ],
+    'a measure field that is not UTF-8' => [
+        ['measures' => [['fn' => 'count'], ['fn' => 'sum', 'field' => "to\xB1tal"]]],
+        AggregateErrorCode::InvalidField, 'measures.1.field',
+    ],
+    'a group field that is not UTF-8' => [
+        ['measures' => [['fn' => 'count']], 'group_by' => ['field' => "sta\xB1tus"]],
+        AggregateErrorCode::InvalidField, 'group_by.field',
+    ],
+    'a group label that is not UTF-8' => [
+        ['measures' => [['fn' => 'count']], 'group_by' => ['field' => 'customer_id', 'label' => "customer.na\xB1me"]],
+        AggregateErrorCode::InvalidField, 'group_by.label',
+    ],
+    'a bucket that is not UTF-8' => [
+        [
+            'measures' => [['fn' => 'count']],
+            'group_by' => ['field' => 'ordered_at', 'bucket' => "mon\xB1th"],
+            'period' => ['field' => 'ordered_at', 'preset' => 'this_year'],
+        ],
+        AggregateErrorCode::InvalidField, 'group_by.bucket',
+    ],
+    'a period field that is not UTF-8' => [
+        ['measures' => [['fn' => 'count']], 'period' => ['field' => "orde\xB1red_at", 'preset' => 'this_year']],
+        AggregateErrorCode::InvalidField, 'period.field',
+    ],
+    'a period preset that is not UTF-8' => [
+        ['measures' => [['fn' => 'count']], 'period' => ['field' => 'ordered_at', 'preset' => "this_ye\xB1ar"]],
+        AggregateErrorCode::InvalidField, 'period',
+    ],
+    'a sort key that is not UTF-8' => [
+        ['measures' => [['fn' => 'count']], 'group_by' => ['field' => 'status'], 'sort' => ['by' => "ke\xB1y"]],
+        AggregateErrorCode::InvalidField, 'sort.by',
+    ],
+    'a comparison that is not UTF-8' => [
+        [
+            'measures' => [['fn' => 'count']],
+            'period' => ['field' => 'ordered_at', 'preset' => 'this_year'],
+            'compare' => "previous_per\xB1iod",
+        ],
+        AggregateErrorCode::InvalidField, 'compare',
+    ],
+    'a limit of any number of digits above max_groups' => [
+        ['measures' => [['fn' => 'count']], 'group_by' => ['field' => 'status'], 'limit' => '1000000000000000'],
+        AggregateErrorCode::TooManyGroups, 'limit',
+    ],
+    'a limit of twenty digits' => [
+        ['measures' => [['fn' => 'count']], 'group_by' => ['field' => 'status'], 'limit' => '99999999999999999999'],
+        AggregateErrorCode::TooManyGroups, 'limit',
+    ],
+    'a limit above max_groups with leading zeros' => [
+        ['measures' => [['fn' => 'count']], 'group_by' => ['field' => 'status'], 'limit' => '0000000000000000000000051'],
+        AggregateErrorCode::TooManyGroups, 'limit',
+    ],
+    'a limit that a JSON number decodes to a float beyond the integers' => [
+        ['measures' => [['fn' => 'count']], 'group_by' => ['field' => 'status'], 'limit' => 1.0E20],
+        AggregateErrorCode::TooManyGroups, 'limit',
+    ],
+    'a count of last of any number of digits' => [
+        ['measures' => [['fn' => 'count']], 'period' => ['field' => 'ordered_at', 'last' => ['n' => '99999999999999999999', 'unit' => 'day']]],
+        AggregateErrorCode::InvalidField, 'period',
+    ],
 ]);
+
+it('tells a limit that is too large from one that is not a number', function (): void {
+    $build = fn (string $limit): Closure => fn (): AggregateQuery => AggregateQuery::fromArray([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'status'],
+        'limit' => $limit,
+    ], $this->limits);
+
+    expect($build('1000000000000000'))->toThrow(static fn (AggregateException $exception) => expect($exception->getMessage())->not->toContain('whole number'))
+        ->and($build('many'))->toThrow(AggregateException::class, 'whole number');
+});
 
 it('applies the limits it is given', function (): void {
     $limits = new AggregateLimits(maxMeasures: 1, maxGroups: 5, maxPoints: 400, maxPeriodDays: 1096, maxObjectsPerMessage: 6, ratePerMinute: 60);
@@ -382,7 +490,35 @@ it('reads the limit, other and compare in the forms a client sends', function (m
     'a numeric string limit' => ['5', true, 'previous_period', 5, true, true],
     'a whole float limit' => [5.0, true, true, 5, true, true],
     'an integer limit' => [50, false, 'previous_period', 50, false, true],
+    'a numeric string with a long run of zeros' => ['0000000000000000000000005', false, false, 5, false, false],
+    'a zero-padded string at the limit' => ['050', false, null, 50, false, false],
 ]);
+
+it('accepts measures that differ in their function or in their field', function (): void {
+    $query = AggregateQuery::fromArray([
+        'measures' => [['fn' => 'sum', 'field' => 'total'], ['fn' => 'avg', 'field' => 'total'], ['fn' => 'sum', 'field' => 'quantity']],
+    ], $this->limits);
+
+    $counts = AggregateQuery::fromArray([
+        'measures' => [['fn' => 'count'], ['fn' => 'count', 'field' => 'status']],
+    ], $this->limits);
+
+    expect(array_map(static fn (AggregateMeasure $measure): string => $measure->name(), $query->measures))->toBe(['sum_total', 'avg_total', 'sum_quantity'])
+        ->and(array_map(static fn (AggregateMeasure $measure): string => $measure->name(), $counts->measures))->toBe(['count', 'count_status']);
+});
+
+it('accepts a label on a column group and a limit on a column group', function (): void {
+    $query = AggregateQuery::fromArray([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'customer_id', 'label' => 'customer.name'],
+        'limit' => 10,
+        'other' => true,
+    ], $this->limits);
+
+    expect($query->group?->label)->toBe('customer.name')
+        ->and($query->limit)->toBe(10)
+        ->and($query->other)->toBeTrue();
+});
 
 it('gives the normalized request without the kind and the resource', function (): void {
     $query = AggregateQuery::fromArray([

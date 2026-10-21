@@ -161,7 +161,7 @@ final readonly class AggregatePeriod
         $unit = TimeBucket::fromInput($last['unit']);
 
         if (! $unit instanceof TimeBucket) {
-            throw self::invalid('The unit of "last" is one of ' . self::bucketNames() . '.');
+            throw self::invalid('The unit of "last" is one of ' . implode(', ', TimeBucket::names()) . '.');
         }
 
         return [self::bucketStart($unit, $today, $last['n'] - 1), $today];
@@ -226,11 +226,6 @@ final readonly class AggregatePeriod
             TimeBucket::Quarter => $start->subQuarters($back),
             TimeBucket::Year => $start->subYears($back),
         };
-    }
-
-    private static function bucketNames(): string
-    {
-        return implode(', ', array_map(static fn (TimeBucket $bucket): string => $bucket->value, TimeBucket::cases()));
     }
 
     private static function timezone(): string

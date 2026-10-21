@@ -20,6 +20,16 @@ enum TimeBucket: string
     case Year = 'year';
 
     /**
+     * The names a client writes a bucket as, in the order of the cases.
+     *
+     * @return list<string>
+     */
+    public static function names(): array
+    {
+        return array_map(static fn (self $bucket): string => $bucket->value, self::cases());
+    }
+
+    /**
      * The bucket a client names, or null when the contract has no such bucket. The match is exact.
      */
     public static function fromInput(string $value): ?self
