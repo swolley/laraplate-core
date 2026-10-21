@@ -10,13 +10,10 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as BaseQueryBuilder;
 use Illuminate\Database\Query\Expression;
-use Illuminate\Database\Query\Grammars\Grammar;
-use LogicException;
 use Modules\Core\Enums\AggregateErrorCode;
 use Modules\Core\Enums\TimeBucket;
 use Modules\Core\Exceptions\AggregateException;
 use Modules\Core\Support\ColumnKinds;
-use UnexpectedValueException;
 
 /**
  * Runs an {@see AggregateQuery} over the rows of an {@see AggregateScope} and returns the {@see AggregateResult} of
@@ -26,17 +23,24 @@ use UnexpectedValueException;
  * bound it. No text of the request reaches SQL: a field is used only once it is a column of the model, or of the
  * model a to-one relation reaches ({@see ColumnKinds::exists()}), and then qualified by its table and wrapped by
  * the grammar of the connection; a function is one of a closed list; a figure is selected under a positional
- * alias (`m0`, `m1`, ...) and named after its measure in PHP.
+ * alias (`m0`, `m1`, ...) and named after its measure in PHP ({@see MeasureSql}).
  *
- * Whether the caller may read a field and whether a measure suits its column is checked by the CRUD service before
- * the engine runs. The engine answers an ungrouped request and a request grouped by the value of a column; a time
- * bucket and a period are paths of their own, and a request that needs one is refused with a
- * {@see LogicException} until it exists.
+ * The engine dispatches a request to its path: ungrouped, grouped by the value of a column (here), or grouped by a
+ * time bucket ({@see BucketSeries}). A period ({@see PeriodPlan}) is resolved and checked before any query and
+ * narrows the rows of every path; a comparison ({@see PeriodComparison}) runs the same total, and for a bucket the
+ * same series, over the previous period.
+ *
+ * @phpstan-type Figures array{
+ *     series: list<array{key: mixed, label: ?string, values: array<string, int|float|string|null>}>,
+ *     total: array<string, int|float|string|null>,
+ *     other: array<string, mixed>|null,
+ *     row_count: int,
+ *     group_count: int,
+ *     truncated: bool,
+ * }
  */
 final class AggregateEngine
 {
-    private const string ROW_COUNT_ALIAS = 'row_count';
-
     private const string GROUP_KEY_ALIAS = 'group_key';
 
     private const string DISTINCT_KEYS_ALIAS = 'distinct_keys';
@@ -49,7 +53,7 @@ final class AggregateEngine
      * The limits are applied here too, because an {@see AggregateQuery} can be built without
      * {@see AggregateQuery::fromArray()}, which applies them to a request.
      *
-     * @throws AggregateException when the query holds more measures or asks for more groups than the limits, a measure is not a function of the closed list or names a field that is not a column of the model, or the group field is not a column the engine can group by
+     * @throws AggregateException when the query holds more measures or asks for more groups than the limits, a measure is not a function of the closed list or names a field that is not a column of the model, the group field is not a column the engine can group by, or the period is malformed or too long for the limits
      * @throws AuthorizationException when the caller may not select the related entity of a relation group or of a group label, which the scope reads as the facets do
      */
     public function run(AggregateScope $scope, AggregateQuery $query, CarbonImmutable $now): AggregateResult
@@ -60,51 +64,30 @@ final class AggregateEngine
             $this->limits->assertGroupLimit($query->limit);
         }
 
-        if ($query->period !== null) {
-            throw new LogicException('An aggregate over a period is not computed yet: the engine computes the totals and the groups of a column only.');
-        }
+        $plan = PeriodPlan::resolve($scope->model, $query, $this->limits, $now);
+        $rows = $plan instanceof PeriodPlan ? PeriodPlan::narrow($scope, $plan->current) : $scope;
 
-        if ($query->group instanceof AggregateGroup) {
-            return $this->grouped($scope, $query, $query->group, $now);
+        if ($plan instanceof PeriodPlan && $plan->bucket instanceof TimeBucket) {
+            $figures = $this->bucketed($rows, $query, $plan->current, $plan->bucket);
+        } elseif ($query->group instanceof AggregateGroup) {
+            $figures = $this->grouped($rows, $query, $query->group);
+        } else {
+            $figures = $this->ungrouped($rows, $query);
         }
-
-        ['values' => $total, 'row_count' => $row_count] = $this->totals($scope, $query->measures);
 
         return new AggregateResult(
-            series: [],
-            total: $total,
-            other: null,
-            compare: null,
+            series: $figures['series'],
+            total: $figures['total'],
+            other: $figures['other'],
+            compare: $plan instanceof PeriodPlan ? PeriodComparison::read($scope, $query, $plan) : null,
             meta: [
-                'row_count' => $row_count,
-                'group_count' => 0,
-                'truncated' => false,
+                ...($plan instanceof PeriodPlan ? $plan->meta() : []),
+                'row_count' => $figures['row_count'],
+                'group_count' => $figures['group_count'],
+                'truncated' => $figures['truncated'],
                 'generated_at' => $now->toIso8601ZuluString(),
             ],
         );
-    }
-
-    private static function alias(int $index): string
-    {
-        return 'm' . $index;
-    }
-
-    /**
-     * A figure as JSON carries it (ruling R8): a number stays a number, and a numeric string, as which a driver
-     * may return a decimal or a count, becomes the number it spells. Any other text is the minimum or the maximum
-     * of a date-time column, and stays as the database holds it.
-     */
-    private static function figure(mixed $value): int|float|string|null
-    {
-        if ($value === null || is_int($value) || is_float($value)) {
-            return $value;
-        }
-
-        if (is_string($value)) {
-            return is_numeric($value) ? 0 + $value : $value;
-        }
-
-        throw new UnexpectedValueException(sprintf('An aggregate function returned %s, which is neither a number nor a text.', get_debug_type($value)));
     }
 
     /**
@@ -125,47 +108,33 @@ final class AggregateEngine
     }
 
     /**
-     * The figures of a row read by {@see self::measureColumns()}, named after their measures.
-     *
-     * @param  array<array-key, mixed>  $row
-     * @param  list<AggregateMeasure>  $measures
-     * @return array<string, int|float|string|null>
-     */
-    private static function figures(array $row, array $measures): array
-    {
-        $values = [];
-
-        foreach ($measures as $index => $measure) {
-            $values[$measure->name()] = self::figure($row[self::alias($index)] ?? null);
-        }
-
-        return $values;
-    }
-
-    /**
-     * One query over every row of the scope: each measure, and the number of rows.
-     *
-     * The ordering of the base query is dropped: the default ordering of a model means nothing to an aggregate,
-     * and an ORDER BY on a plain column next to an aggregate function is refused by MySQL (only_full_group_by)
-     * and by PostgreSQL.
-     *
-     * @param  list<AggregateMeasure>  $measures
+     * The total over every row of the scope, with no series.
      *
      * @throws AggregateException
      *
-     * @return array{values: array<string, int|float|string|null>, row_count: int}
+     * @return Figures
      */
-    private function totals(AggregateScope $scope, array $measures): array
+    private function ungrouped(AggregateScope $scope, AggregateQuery $query): array
     {
-        $query = ($scope->baseQuery)()->toBase()->reorder();
-        $grammar = $query->getGrammar();
+        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures);
 
-        $select = $this->measureColumns($scope->model, $grammar, $measures);
-        $select[] = new Expression('count(*) as ' . $grammar->wrap(self::ROW_COUNT_ALIAS));
+        return ['series' => [], 'total' => $total, 'other' => null, 'row_count' => $row_count, 'group_count' => 0, 'truncated' => false];
+    }
 
-        $row = (array) $query->select($select)->first();
+    /**
+     * The buckets of the period (spec 4.3): every bucket is shown, so the series is never truncated and the group
+     * count is the number of buckets; the total and the row count are those of the rows in the period.
+     *
+     * @throws AggregateException
+     *
+     * @return Figures
+     */
+    private function bucketed(AggregateScope $scope, AggregateQuery $query, AggregatePeriod $period, TimeBucket $bucket): array
+    {
+        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures);
+        $series = BucketSeries::read($scope, $query, $period, $bucket);
 
-        return ['values' => self::figures($row, $measures), 'row_count' => (int) self::figure($row[self::ROW_COUNT_ALIAS] ?? 0)];
+        return ['series' => $series, 'total' => $total, 'other' => null, 'row_count' => $row_count, 'group_count' => count($series), 'truncated' => false];
     }
 
     /**
@@ -177,13 +146,11 @@ final class AggregateEngine
      *
      * @throws AggregateException
      * @throws AuthorizationException
+     *
+     * @return Figures
      */
-    private function grouped(AggregateScope $scope, AggregateQuery $query, AggregateGroup $group, CarbonImmutable $now): AggregateResult
+    private function grouped(AggregateScope $scope, AggregateQuery $query, AggregateGroup $group): array
     {
-        if ($group->bucket instanceof TimeBucket) {
-            throw new LogicException('A group by a time bucket is not computed yet: the engine computes the groups of a column only.');
-        }
-
         ['rows' => $rows, 'column' => $column, 'keyIsLabel' => $key_is_label] = $this->groupSource($scope, $group);
 
         $group_count = $this->groupCount($rows(), $column);
@@ -196,7 +163,7 @@ final class AggregateEngine
             );
         }
 
-        ['values' => $total, 'row_count' => $row_count] = $this->totals($scope, $query->measures);
+        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures);
 
         $groups = $this->groupRows($scope->model, $rows(), $column, $query);
         $keys = array_column($groups, 'key');
@@ -213,23 +180,12 @@ final class AggregateEngine
 
         if ($query->other && $truncated) {
             $rest = $this->rest($rows(), $column, $keys);
-            $rest_row = (array) $rest->select($this->measureColumns($scope->model, $rest->getGrammar(), $query->measures))->first();
+            $rest_row = (array) $rest->select(MeasureSql::select($scope->model, $rest->getGrammar(), $query->measures))->first();
 
-            $other = [...self::figures($rest_row, $query->measures), 'groups' => $group_count - count($series)];
+            $other = [...MeasureSql::figures($rest_row, $query->measures), 'groups' => $group_count - count($series)];
         }
 
-        return new AggregateResult(
-            series: $series,
-            total: $total,
-            other: $other,
-            compare: null,
-            meta: [
-                'row_count' => $row_count,
-                'group_count' => $group_count,
-                'truncated' => $truncated,
-                'generated_at' => $now->toIso8601ZuluString(),
-            ],
-        );
+        return ['series' => $series, 'total' => $total, 'other' => $other, 'row_count' => $row_count, 'group_count' => $group_count, 'truncated' => $truncated];
     }
 
     /**
@@ -295,8 +251,8 @@ final class AggregateEngine
             new Expression('count(*) - count(' . $key . ') as ' . $grammar->wrap(self::NULL_KEY_ROWS_ALIAS)),
         ])->first();
 
-        $distinct_keys = (int) self::figure($row[self::DISTINCT_KEYS_ALIAS] ?? 0);
-        $null_key_rows = (int) self::figure($row[self::NULL_KEY_ROWS_ALIAS] ?? 0);
+        $distinct_keys = (int) MeasureSql::figure($row[self::DISTINCT_KEYS_ALIAS] ?? 0);
+        $null_key_rows = (int) MeasureSql::figure($row[self::NULL_KEY_ROWS_ALIAS] ?? 0);
 
         return $distinct_keys + ($null_key_rows > 0 ? 1 : 0);
     }
@@ -311,13 +267,13 @@ final class AggregateEngine
      */
     private function groupRows(Model $model, BaseQueryBuilder $rows, string $column, AggregateQuery $query): array
     {
-        $rows->select([$column . ' as ' . self::GROUP_KEY_ALIAS, ...$this->measureColumns($model, $rows->getGrammar(), $query->measures)])
+        $rows->select([$column . ' as ' . self::GROUP_KEY_ALIAS, ...MeasureSql::select($model, $rows->getGrammar(), $query->measures)])
             ->groupBy($column);
 
         if ($query->sortBy === 'key') {
             $rows->orderBy($column, $query->sortDir);
         } else {
-            $rows->orderBy(self::alias(0), $query->sortDir)->orderBy($column);
+            $rows->orderBy(MeasureSql::alias(0), $query->sortDir)->orderBy($column);
         }
 
         if ($query->limit !== null) {
@@ -328,7 +284,7 @@ final class AggregateEngine
 
         foreach ($rows->get() as $row) {
             $row = (array) $row;
-            $groups[] = ['key' => $row[self::GROUP_KEY_ALIAS] ?? null, 'values' => self::figures($row, $query->measures)];
+            $groups[] = ['key' => $row[self::GROUP_KEY_ALIAS] ?? null, 'values' => MeasureSql::figures($row, $query->measures)];
         }
 
         return $groups;
@@ -383,68 +339,5 @@ final class AggregateEngine
         }
 
         return $rows->where(static fn (BaseQueryBuilder $rest): BaseQueryBuilder => $rest->whereNotIn($column, $values)->orWhereNull($column));
-    }
-
-    /**
-     * The select of the measures, each under its positional alias.
-     *
-     * @param  list<AggregateMeasure>  $measures
-     *
-     * @throws AggregateException
-     *
-     * @return list<Expression<string>>
-     */
-    private function measureColumns(Model $model, Grammar $grammar, array $measures): array
-    {
-        $select = [];
-
-        foreach ($measures as $index => $measure) {
-            $select[] = new Expression($this->measureExpression($model, $grammar, $measure, $index) . ' as ' . $grammar->wrap(self::alias($index)));
-        }
-
-        return $select;
-    }
-
-    /**
-     * The SQL of one measure: `count(*)`, or a function of the closed list over the qualified, wrapped column.
-     *
-     * @throws AggregateException
-     */
-    private function measureExpression(Model $model, Grammar $grammar, AggregateMeasure $measure, int $index): string
-    {
-        $function = match ($measure->fn) {
-            'count' => 'count',
-            'sum' => 'sum',
-            'avg' => 'avg',
-            'min' => 'min',
-            'max' => 'max',
-            default => throw new AggregateException(
-                AggregateErrorCode::UnsupportedFunction,
-                'The function of a measure is one of count, sum, avg, min, max.',
-                'measures.' . $index . '.fn',
-            ),
-        };
-
-        if ($measure->field === null) {
-            if ($function !== 'count') {
-                throw new AggregateException(
-                    AggregateErrorCode::InvalidField,
-                    sprintf('The function "%s" needs a field.', $function),
-                    'measures.' . $index . '.field',
-                );
-            }
-
-            return 'count(*)';
-        }
-
-        if (! ColumnKinds::exists($model, $measure->field)) {
-            throw new AggregateException(
-                AggregateErrorCode::InvalidField,
-                sprintf('"%s" is not a column of the entity.', $measure->field),
-                'measures.' . $index . '.field',
-            );
-        }
-
-        return $function . '(' . $grammar->wrap($model->qualifyColumn($measure->field)) . ')';
     }
 }

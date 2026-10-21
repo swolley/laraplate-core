@@ -55,6 +55,7 @@ use Modules\Core\Contracts\ProvidesSyncableRelations;
 use Modules\Core\Contracts\RestrictsCrudWrites;
 use Modules\Core\Enums\AggregateErrorCode;
 use Modules\Core\Enums\ColumnKind;
+use Modules\Core\Enums\TimeBucket;
 use Modules\Core\Exceptions\AggregateException;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\LocaleContext;
@@ -1824,8 +1825,9 @@ class CrudService
      * Refuses, before anything is queried, a field of an aggregate request the engine may not read (spec 4.2, 4.5):
      * a measure field is a column of the entity itself; a group field is a column of the entity or of a single-hop
      * to-one relation (`customer.country`); a group label is a column of the to-one relation whose foreign key is the
-     * group field; a period field is a column of the entity. The caller must be able to read each of them, and a
-     * measure must suit its column. The sort names no field: it follows the first measure or the group.
+     * group field; a period field is a column of the entity. The caller must be able to read each of them, a
+     * measure must suit its column, and a period field and the field of a time bucket must be date columns. The
+     * sort names no field: it follows the first measure or the group.
      *
      * @throws AggregateException
      */
@@ -1852,6 +1854,8 @@ class CrudService
             }
         }
 
+        $period_field = null;
+
         if ($query->period !== null) {
             $period_field = $query->period['field'] ?? null;
             $period_field = is_string($period_field) ? $period_field : '';
@@ -1860,6 +1864,30 @@ class CrudService
 
         foreach ($query->measures as $index => $measure) {
             $this->assertMeasurable($model, $measure, 'measures.' . $index . '.field');
+        }
+
+        if ($group instanceof AggregateGroup && $group->bucket instanceof TimeBucket) {
+            $this->assertTemporal($model, $group->field, 'group_by.field');
+        }
+
+        if ($period_field !== null) {
+            $this->assertTemporal($model, $period_field, 'period.field');
+        }
+    }
+
+    /**
+     * A period is measured on, and a time bucket cuts, a date or date-time column of the entity itself (spec 4.4).
+     *
+     * @throws AggregateException INVALID_FIELD
+     */
+    private function assertTemporal(Model $model, string $column, string $field): void
+    {
+        if (ColumnKinds::of($model, $column) !== ColumnKind::Temporal) {
+            throw new AggregateException(
+                AggregateErrorCode::InvalidField,
+                sprintf('"%s" is not a date column of the entity: a period and a time bucket need a column of dates.', $column),
+                $field,
+            );
         }
     }
 
