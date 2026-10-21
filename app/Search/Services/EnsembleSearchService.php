@@ -106,9 +106,14 @@ class EnsembleSearchService
             } catch (Throwable $exception) {
                 // A reranker failure (e.g. the cross-encoder service is down) must
                 // not break search: keep the fused results unreranked and record
-                // that reranking did not run.
+                // that reranking did not run. A failure that carries a report
+                // context (a request id, a status) keeps it, as the exception
+                // handler would.
+                $context = method_exists($exception, 'context') ? $exception->context() : [];
+
                 Log::warning('Reranker failed; returning fused results without reranking', [
                     'error' => $exception->getMessage(),
+                    ...(is_array($context) ? $context : []),
                 ]);
 
                 app(SearchDegradations::class)->note(SearchDegradations::RERANKER_FAILED);

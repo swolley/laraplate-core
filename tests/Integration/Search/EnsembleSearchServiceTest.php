@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Builder as ScoutBuilder;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Search\Contracts\IReranker;
@@ -15,6 +16,7 @@ use Modules\Core\Search\Services\SearchQueryAnalyzer;
 use Modules\Core\Search\Services\TextMatchOptionsResolver;
 use Modules\Core\Search\Traits\CommonEngineFunctions;
 use Modules\Core\Tests\Integration\Search\EnsembleSearchPaginatorTestModel;
+use Modules\Core\Tests\Stubs\Search\ContextualRerankerFailure;
 use Modules\Core\Tests\Stubs\Search\FusionFixtureSearchModel;
 use Modules\Core\Tests\Stubs\Search\FusionFixtureTranslatedSearchModel;
 
@@ -135,6 +137,37 @@ it('degrades to fused results when the reranker throws', function (): void {
     expect($result->hits)->not->toBeEmpty()
         ->and($result->meta['reranked'])->toBeFalse()
         ->and($degradations->first())->toBe('reranker_failed');
+});
+
+/**
+ * A reranker failure that carries a report context (a request id, a status) keeps it in the warning, as the
+ * exception handler would, instead of leaving it only in the message.
+ */
+it('logs the report context of a reranker failure with the warning', function (): void {
+    EnsembleSearchPaginatorTestModel::$lastBuilder = null;
+    Log::spy();
+
+    $throwing = Mockery::mock(IReranker::class);
+    $throwing->shouldReceive('score')->andThrow(new ContextualRerankerFailure('reranker service busy'));
+
+    (new EnsembleSearchService($throwing))->search(
+        model: new EnsembleSearchPaginatorTestModel(),
+        query: 'needle',
+        plan: [
+            'retrieval' => ['use_fulltext' => true, 'use_vector' => false],
+            'ensemble' => [],
+            'ranking' => ['use_reranker' => true],
+        ],
+        vector: null,
+        page: 1,
+        perPage: 5,
+    );
+
+    Log::shouldHaveReceived('warning')->once()->with('Reranker failed; returning fused results without reranking', [
+        'error' => 'reranker service busy',
+        'request_id' => 'abc123',
+        'status' => 503,
+    ]);
 });
 
 it('does not rerank by default when the plan does not specify the flag', function (): void {

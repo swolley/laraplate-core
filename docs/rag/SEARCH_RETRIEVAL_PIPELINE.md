@@ -496,7 +496,7 @@ See `Modules/AI/docs/rag/MODULE.md` for datasets, metrics and baseline locations
 | Symptom | Check |
 |---------|-------|
 | `strategies_executed = 1` when vectors were expected | digits in the query, `core.search.vector.enabled`, AI module present, engine kNN support |
-| `reranked = false` | reranker service reachable; look for the `Reranker failed` warning |
+| `reranked = false` | reranker service reachable; look for the `Reranker failed` warning (its context carries the reranker's own report context, such as a `request_id`, when the failure has one) |
 | `unsupported_driver = true` | Scout driver is not an orchestration-capable `ISearchEngine` |
 | `meta.vector_disabled` = `suspended` | an embedding model switch runs or failed: `ai:embeddings:status`, then `ai:embeddings:switch --resume` or `--abandon` |
 | `meta.vector_disabled` = `dimension_mismatch` | the index maps another length than `core.search.vector.dimensions`: finish the switch, or recreate the index |
