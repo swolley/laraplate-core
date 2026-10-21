@@ -180,7 +180,7 @@ class EnsembleSearchService
      */
     public function applyRequestedLocale(ScoutBuilder $builder, Model $model): void
     {
-        $engine = $model->searchableUsing();
+        $engine = $this->engineOf($model);
 
         if ($engine instanceof ILocaleFilterableEngine && $engine->filtersByLocale($model)) {
             $builder->where('locales', [LocaleContext::get()]);
@@ -273,9 +273,25 @@ class EnsembleSearchService
         );
     }
 
+    /**
+     * The search engine of a model, or null when it has none: a model without `searchableUsing()`, or one
+     * that answers no engine. The engine is read by capability (`method_exists()`, the engine contracts),
+     * not by class, and every caller degrades without one.
+     */
+    private function engineOf(Model $model): ?object
+    {
+        $engine = method_exists($model, 'searchableUsing') ? $model->searchableUsing() : null;
+
+        return is_object($engine) ? $engine : null;
+    }
+
     private function driverName(Model $model): string
     {
-        $engine = $model->searchableUsing();
+        $engine = $this->engineOf($model);
+
+        if ($engine === null) {
+            return 'none';
+        }
 
         return method_exists($engine, 'getName') ? $engine->getName() : $engine::class;
     }
@@ -285,9 +301,9 @@ class EnsembleSearchService
      */
     private function textMatchDegradations(Model $model, ResolvedTextMatch $textMatch): array
     {
-        $engine = $model->searchableUsing();
+        $engine = $this->engineOf($model);
 
-        if (! method_exists($engine, 'textMatchCapabilities')) {
+        if ($engine === null || ! method_exists($engine, 'textMatchCapabilities')) {
             return ['capabilities'];
         }
 
@@ -421,7 +437,7 @@ class EnsembleSearchService
      * The text the model provides for the hits to rerank, in the language of the search, keyed by hit id.
      * Empty for a model that provides none: its hits are read for text as they are.
      *
-     * @param  list<array<string, mixed>>  $items
+     * @param  list<FusedHit>  $items
      * @return array<string, string>
      */
     private function providedRerankerTexts(Model $model, array $items): array
