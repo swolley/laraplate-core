@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FiltersGroup;
 use Modules\Core\Enums\AggregateErrorCode;
+use Modules\Core\Enums\TimeBucket;
 use Modules\Core\Exceptions\AggregateException;
 use Modules\Core\Services\Crud\Aggregate\AggregateGroup;
 use Modules\Core\Services\Crud\Aggregate\AggregateLimits;
@@ -510,6 +511,45 @@ it('holds a query built without its validator to max_groups', function (): void 
             expect($exception->toArray())->toBe(['code' => 'TOO_MANY_GROUPS', 'message' => 'The limit is at most 2 groups.', 'field' => 'limit']);
         });
 });
+
+it('holds a query built without its validator to the shape its figures need', function (array $shape, array $error): void {
+    AggregateTestKit::seedOrders([['ordered_at' => '2026-01-15 12:00:00'], ['ordered_at' => '2026-02-15 12:00:00']]);
+    $query = new AggregateQuery(...[
+        'measures' => [new AggregateMeasure('count', null)],
+        'group' => null,
+        'period' => null,
+        'sortBy' => 'measure',
+        'sortDir' => 'desc',
+        'limit' => null,
+        'other' => false,
+        'compare' => false,
+        ...$shape,
+    ]);
+
+    expect(fn (): AggregateResult => app(CrudService::class)->aggregate(AggregateTestKit::listData(new AggregateOrderStubModel), $query))
+        ->toThrow(function (AggregateException $exception) use ($error): void {
+            expect([$exception->errorCode->value, $exception->field])->toBe($error);
+        });
+})->with([
+    'a bucket with a limit' => [[
+        'group' => new AggregateGroup('ordered_at', TimeBucket::Month),
+        'period' => ['field' => 'ordered_at', 'from' => '2026-01-01', 'to' => '2026-03-31'],
+        'sortBy' => 'key',
+        'sortDir' => 'asc',
+        'limit' => 1,
+    ], ['INVALID_FIELD', 'limit']],
+    'a bucket with the rest of the groups' => [[
+        'group' => new AggregateGroup('ordered_at', TimeBucket::Month),
+        'period' => ['field' => 'ordered_at', 'from' => '2026-01-01', 'to' => '2026-03-31'],
+        'sortBy' => 'key',
+        'sortDir' => 'asc',
+        'other' => true,
+    ], ['INVALID_FIELD', 'other']],
+    'a limit with no group' => [['limit' => 1], ['INVALID_FIELD', 'limit']],
+    'the rest of the groups with no group' => [['other' => true], ['INVALID_FIELD', 'other']],
+    'a bucket with no period' => [['group' => new AggregateGroup('ordered_at', TimeBucket::Month)], ['INVALID_FIELD', 'period']],
+    'a comparison with no period' => [['compare' => true], ['INVALID_FIELD', 'compare']],
+]);
 
 it('more groups than max_groups with no limit is TOO_MANY_GROUPS', function (): void {
     config(['core.aggregate.max_groups' => 2]);

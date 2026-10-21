@@ -7,7 +7,8 @@ use Modules\Core\Exceptions\AggregateException;
 use Modules\Core\Support\DayTruncation;
 
 it('builds the day expression of each driver', function (string $driver, string $expected): void {
-    expect(DayTruncation::expression($driver, '"orders"."ordered_at"'))->toBe($expected);
+    expect(DayTruncation::expression($driver, '"orders"."ordered_at"'))->toBe($expected)
+        ->and(DayTruncation::supports($driver))->toBeTrue();
 })->with([
     'sqlite' => ['sqlite', 'date("orders"."ordered_at")'],
     'mysql' => ['mysql', 'DATE("orders"."ordered_at")'],
@@ -18,6 +19,8 @@ it('builds the day expression of each driver', function (string $driver, string 
 ]);
 
 it('refuses a bucket on a driver it has no expression for', function (): void {
+    expect(DayTruncation::supports('firebird'))->toBeFalse();
+
     expect(fn (): string => DayTruncation::expression('firebird', '"orders"."ordered_at"'))
         ->toThrow(static fn (AggregateException $exception) => expect($exception->errorCode)->toBe(AggregateErrorCode::UnsupportedFunction)
             ->and($exception->errorCode->value)->toBe('UNSUPPORTED_FUNCTION')

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\SQLiteConnection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Casts\Filter;
@@ -45,10 +46,10 @@ function aggregate_buckets(array $request, ?FiltersGroup $filters = null, ?Model
  *
  * @param  array<string, mixed>  $request
  */
-function aggregate_buckets_refusal(array $request): AggregateException
+function aggregate_buckets_refusal(array $request, ?Model $model = null): AggregateException
 {
     try {
-        aggregate_buckets($request);
+        aggregate_buckets($request, model: $model);
     } catch (AggregateException $exception) {
         return $exception;
     }
@@ -61,12 +62,27 @@ function aggregate_buckets_refusal(array $request): AggregateException
  *
  * @return list<string>
  */
-function aggregate_buckets_order_reads(): array
+function aggregate_buckets_order_reads(?string $connection = null): array
 {
     return array_values(array_filter(
-        array_column(DB::getQueryLog(), 'query'),
+        array_column(DB::connection($connection)->getQueryLog(), 'query'),
         static fn (string $sql): bool => str_contains($sql, 'from "aggregate_orders"'),
     ));
+}
+
+/**
+ * The orders read through a connection that shares the test database but names a driver the aggregate has no day
+ * expression for.
+ */
+function aggregate_buckets_orders_on_driver(string $driver): AggregateOrderStubModel
+{
+    config(['database.connections.aggregate_other_driver' => ['driver' => $driver, 'database' => ':memory:', 'prefix' => '']]);
+    DB::extend('aggregate_other_driver', static fn (array $config): SQLiteConnection => new SQLiteConnection(DB::connection()->getPdo(), ':memory:', '', $config));
+
+    $order = new AggregateOrderStubModel;
+    $order->setConnection('aggregate_other_driver');
+
+    return $order;
 }
 
 /**
@@ -340,6 +356,28 @@ it('a bucket count above max_points is PERIOD_TOO_LONG', function (): void {
         'message' => 'The period gives 500 day buckets, more than 400: use a coarser bucket, such as week.',
         'field' => 'group_by.bucket',
     ])
+        ->and(aggregate_buckets_order_reads())->toBe([]);
+});
+
+it('a bucket on a driver with no day expression is UNSUPPORTED_FUNCTION before any query', function (): void {
+    AggregateTestKit::seedOrders([['ordered_at' => '2026-01-15 12:00:00']]);
+    $order = aggregate_buckets_orders_on_driver('firebird');
+    DB::enableQueryLog();
+    DB::connection('aggregate_other_driver')->enableQueryLog();
+
+    $refusal = aggregate_buckets_refusal([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'ordered_at', 'bucket' => 'month'],
+        'period' => ['field' => 'ordered_at', 'from' => '2026-01-01', 'to' => '2026-01-31'],
+    ], $order);
+
+    expect($refusal->toArray())->toBe([
+        'code' => 'UNSUPPORTED_FUNCTION',
+        'message' => 'Time buckets are not supported on the "firebird" database driver.',
+        'field' => 'group_by.bucket',
+    ])
+        ->and($refusal->reportable)->toBeTrue()
+        ->and(aggregate_buckets_order_reads('aggregate_other_driver'))->toBe([])
         ->and(aggregate_buckets_order_reads())->toBe([]);
 });
 

@@ -31,6 +31,11 @@ use Modules\Core\Support\ColumnKinds;
  * same series, over the previous period. Every path selects the currency partials of its amounts, and a cell that
  * adds amounts of more than one currency has no value there ({@see CurrencyCheck}).
  *
+ * A query built without {@see AggregateQuery::fromArray()} is held to the rules of the validator whose absence
+ * would give wrong figures: the limits of measures and groups, a period for a time bucket and for a comparison
+ * ({@see PeriodPlan}), and a limit and the rest of the groups only on the groups of a column. The other rules of the
+ * validator (a measure asked twice, a label on a time bucket) stay its own: skipping them changes no figure.
+ *
  * @phpstan-type Figures array{
  *     series: list<array{key: mixed, label: ?string, values: array<string, int|float|string|null>}>,
  *     total: array<string, int|float|string|null>,
@@ -52,9 +57,10 @@ final class AggregateEngine
 
     /**
      * The limits are applied here too, because an {@see AggregateQuery} can be built without
-     * {@see AggregateQuery::fromArray()}, which applies them to a request.
+     * {@see AggregateQuery::fromArray()}, which applies them to a request; so are the rules of its shape whose
+     * absence would give wrong figures (see the class).
      *
-     * @throws AggregateException when the query holds more measures or asks for more groups than the limits, a measure is not a function of the closed list or names a field that is not a column of the model, the group field is not a column the engine can group by, or the period is malformed or too long for the limits
+     * @throws AggregateException when the query holds more measures or asks for more groups than the limits, has a limit or the rest of the groups without groups of a column, a measure is not a function of the closed list or names a field that is not a column of the model, the group field is not a column the engine can group by, a time bucket or a comparison has no period, the driver has no day expression for a time bucket, or the period is malformed or too long for the limits
      * @throws AuthorizationException when the caller may not select the related entity of a relation group or of a group label, which the scope reads as the facets do
      */
     public function run(AggregateScope $scope, AggregateQuery $query, CarbonImmutable $now): AggregateResult
@@ -64,6 +70,8 @@ final class AggregateEngine
         if ($query->limit !== null) {
             $this->limits->assertGroupLimit($query->limit);
         }
+
+        AggregateQuery::assertGroupOptions($query->group, $query->limit, $query->other);
 
         $plan = PeriodPlan::resolve($scope->model, $query, $this->limits, $now);
         $rows = $plan instanceof PeriodPlan ? PeriodPlan::narrow($scope, $plan->current) : $scope;

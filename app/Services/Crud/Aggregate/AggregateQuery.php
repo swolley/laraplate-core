@@ -87,13 +87,33 @@ final readonly class AggregateQuery
             throw self::invalid('other', 'The rest of the groups is shown after a limit: give a limit.');
         }
 
-        if ($limit !== null && (! $group instanceof AggregateGroup || $bucketed)) {
-            throw self::invalid('limit', 'A limit applies to the groups of a column: group by a column that is not a time bucket.');
-        }
+        self::assertGroupOptions($group, $limit, $other);
 
         [$sortBy, $sortDir] = self::sort($input['sort'] ?? null, $bucketed);
 
         return new self($measures, $group, $period, $sortBy, $sortDir, $limit, $other, $compare);
+    }
+
+    /**
+     * Refuses a limit or the rest of the groups on a request that has no groups of a column to cut: no group, or a
+     * group by a time bucket, whose buckets are all shown. The validator and the engine both call it, so a query
+     * built without the validator is not silently left unlimited.
+     *
+     * @throws AggregateException INVALID_FIELD on `limit` or `other`
+     */
+    public static function assertGroupOptions(?AggregateGroup $group, ?int $limit, bool $other): void
+    {
+        if ($group instanceof AggregateGroup && ! $group->bucket instanceof TimeBucket) {
+            return;
+        }
+
+        if ($limit !== null) {
+            throw self::invalid('limit', 'A limit applies to the groups of a column: group by a column that is not a time bucket.');
+        }
+
+        if ($other) {
+            throw self::invalid('other', 'The rest of the groups applies to the groups of a column: group by a column that is not a time bucket.');
+        }
     }
 
     /**

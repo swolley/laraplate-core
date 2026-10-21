@@ -12,6 +12,7 @@ use Modules\Core\Enums\AggregateErrorCode;
 use Modules\Core\Enums\TimeBucket;
 use Modules\Core\Exceptions\AggregateException;
 use Modules\Core\Support\ColumnKinds;
+use Modules\Core\Support\DayTruncation;
 
 /**
  * The period of an aggregate request resolved and checked before any query (spec 4.2, 4.4): the period asked
@@ -35,11 +36,14 @@ final readonly class PeriodPlan
      * The period of the query against the moment of the request; null when the query has none.
      *
      * The limits are checked here, before any query: the period has at most `max_period_days` days, and each
-     * series it gives (the current one and, with a comparison, the previous one) at most `max_points` buckets.
+     * series it gives (the current one and, with a comparison, the previous one) at most `max_points` buckets. So is
+     * the driver of the connection, which must have a day expression for a time bucket ({@see DayTruncation}).
      *
      * @throws AggregateException INVALID_FIELD when the period is malformed or names no column of the model, a time
      *                            bucket or a comparison has no period, or the bucket is not on the field of the
-     *                            period; PERIOD_TOO_LONG when the period is longer, or gives more buckets, than the limits
+     *                            period; UNSUPPORTED_FUNCTION, reported, when the driver has no day expression for
+     *                            the bucket; PERIOD_TOO_LONG when the period is longer, or gives more buckets, than
+     *                            the limits
      */
     public static function resolve(Model $model, AggregateQuery $query, AggregateLimits $limits, CarbonImmutable $now): ?self
     {
@@ -56,6 +60,12 @@ final readonly class PeriodPlan
             }
 
             return null;
+        }
+
+        $driver = $model->getConnection()->getDriverName();
+
+        if ($bucket instanceof TimeBucket && ! DayTruncation::supports($driver)) {
+            throw DayTruncation::unsupported($driver);
         }
 
         $current = AggregatePeriod::resolve($query->period, $now);
