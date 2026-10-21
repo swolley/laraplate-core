@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Modules\Core\Casts\Filter;
 use Modules\Core\Casts\FilterOperator;
@@ -15,63 +13,7 @@ use Modules\Core\Services\Crud\CrudService;
 use Modules\Core\Services\Crud\DTOs\FacetPage;
 use Modules\Core\Services\Crud\DTOs\FacetQuery;
 use Modules\Core\Services\Crud\DTOs\FacetSort;
-
-/**
- * @param  array<string,mixed>  $validated
- */
-function facet_values_request(array $validated = []): Request
-{
-    return new class($validated) extends Request
-    {
-        /**
-         * @param  array<string,mixed>  $validated
-         */
-        public function __construct(private readonly array $validated)
-        {
-            parent::__construct();
-        }
-
-        public function validated(?string $key = null, mixed $default = null): mixed
-        {
-            return $key === null ? $this->validated : ($this->validated[$key] ?? $default);
-        }
-    };
-}
-
-function facet_values_list_data(Model $model, Request $request, ?FiltersGroup $filters = null): Modules\Core\Casts\ListRequestData
-{
-    $data = new ReflectionClass(Modules\Core\Casts\ListRequestData::class)->newInstanceWithoutConstructor();
-
-    $set = static function (object $obj, string $prop, mixed $value): void {
-        $p = new ReflectionProperty($obj, $prop);
-        $p->setValue($obj, $value);
-    };
-
-    foreach ([
-        'request' => $request,
-        'mainEntity' => $model->getTable(),
-        'primaryKey' => $model->getKeyName(),
-        'connection' => $model->getConnectionName(),
-        'model' => $model,
-        'columns' => [],
-        'relations' => [],
-        'sort' => [],
-        'filters' => $filters,
-        'group_by' => [],
-        'pagination' => 25,
-        'page' => null,
-        'skip' => null,
-        'take' => null,
-        'from' => null,
-        'to' => null,
-        'limit' => null,
-        'count' => false,
-    ] as $prop => $value) {
-        $set($data, $prop, $value);
-    }
-
-    return $data;
-}
+use Modules\Core\Tests\Support\AggregateTestKit;
 
 function facet_values_superadmin(): User
 {
@@ -85,9 +27,8 @@ function facet_values_superadmin(): User
 
 function facet_values_service(User $actor, ?FiltersGroup $filters, FacetQuery $facet): FacetPage
 {
-    $request = facet_values_request();
-    $request->setUserResolver(fn (): User => $actor);
-    $base = facet_values_list_data(new User, $request, $filters);
+    $base = AggregateTestKit::listData(new User, $filters);
+    $base->request->setUserResolver(fn (): User => $actor);
 
     return app(CrudService::class)->facetValues($base, $facet);
 }
