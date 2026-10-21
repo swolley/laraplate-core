@@ -101,6 +101,7 @@ HTTP Request
 | `/api/v1/detail/{entity}` | GET | Get single record by primary key |
 | `/api/v1/history/{entity}` | GET | Get record with version history (needs `update` or `approve` on the entity) |
 | `/api/v1/tree/{entity}` | GET | Get hierarchical record (ancestors/descendants) |
+| `/api/v1/aggregate/{module}/{entity}` | GET, POST | Counts, sums, averages, minima and maxima, by group or time bucket (see [Aggregate Route](#aggregate-route)) |
 
 ### Write Operations
 
@@ -334,7 +335,8 @@ session user or a token user.
 A server error (`5xx`) answers the status text (`Internal Server Error`) instead of the exception message
 when `app.debug` is off, for every controller built on `ResponseBuilder` (CRUD, graph, media, settings,
 users): the message of a failed query carries its SQL and bindings. The exception is still reported. Client
-errors (`4xx`) keep their message.
+errors (`4xx`) keep their message. The aggregate route has its own envelope and its own generic `500` message (see
+[Aggregate errors](#aggregate-errors)).
 
 ### Tokens
 
@@ -350,7 +352,7 @@ Details in [rag/API_ACCESS_CONTROL.md](./rag/API_ACCESS_CONTROL.md#tokens).
 
 ### Related records
 
-Select, detail, search, tree, history and facets share one visibility rule for related records. A relation
+Select, detail, search, tree, history, facets and aggregate share one visibility rule for related records. A relation
 to an independent entity is loaded only if the caller holds that entity's `select` permission on the
 request's guard, and its query receives that entity's ACL, as a root query does. This holds for `relations`,
 dotted `columns`, relation filters, sorts, group-by keys and aggregates, and for search, which reloads the
@@ -430,7 +432,9 @@ group-by key may not name a method.
   a media column outside the projection) cannot be read through the query either. A facet field (flat or
   open, its `fields` and `labelField` included), a group-by key, a sort, a filter property or an aggregated
   column naming one answers `400` before anything is queried, on the main model and, for a dotted path, on
-  each related model along it (`Support\ReadableColumnGuard`). A projected media caller may name only
+  each related model along it (`Support\ReadableColumnGuard`). The aggregate route applies the same guard to every
+  field of its request (measure, group key, label, period field, filter property) and answers `422`
+  `UNREADABLE_FIELD` with the path of the field instead of `400`. A projected media caller may name only
   `id`, `collection_name`, `mime_type` and `size`. The ACL filters are exempt: they name columns on their own
   authority.
 - **Graph nodes.** The label and summary fields of a graph node are read only from attributes the model's
@@ -580,7 +584,7 @@ Filter on related models using dot notation:
 
 ### Scope Filters in Requests
 
-A filter can also name a **model scope**, `{ "scope": "valid" }` or `{ "scope": "expiring", "parameters": [48] }`, anywhere a filter or a group may appear (`select`, `search` and `facets` requests share the `filters` vocabulary, and so does a tool call of the in-app assistant):
+A filter can also name a **model scope**, `{ "scope": "valid" }` or `{ "scope": "expiring", "parameters": [48] }`, anywhere a filter or a group may appear (`select`, `search`, `facets` and `aggregate` requests share the `filters` vocabulary, and so does a tool call of the in-app assistant):
 
 ```json
 {
@@ -595,7 +599,7 @@ A filter can also name a **model scope**, `{ "scope": "valid" }` or `{ "scope": 
 - Only scopes the model exposes to clients work: the method must carry `#[FilterScope(client: true)]`. The declared ones are the validity scopes of `HasValidity` (`valid`, `published`, `draft`, `scheduled`, `expired`, `validAt(date)`, `expiredAt(date)`, `expiring(hours)`) on every model using it. `active` and `inactive` (`HasActivation`) are ACL-only, because a scope may read columns a client cannot filter on. How a module declares its own, the parameter rules (scalars and ISO 8601 dates, strict types) and the purity rule are in [ACL_SYSTEM.md](./ACL_SYSTEM.md#scope-filters).
 - A request gets **no placeholders**: `@now`, `@today` and `@user.*` are taken literally.
 - The scope narrows the caller's ACL, never widens it: the request filters are ANDed with the ACL filters.
-- **`422`** when the scope is not declared, is ACL-only, takes a wrong, missing or extra parameter, does more than add where conditions, adds no condition with the given parameters, or reads through a subquery or raw SQL (a relation it would reach escapes the related ACL). The message names the filters path, the scope and the reason (for example `Scope "active" of this entity can be used only in ACLs.`), with the model shown as "this entity" and never a parameter value. `ListRequest` validates the tree (`Rules\ClientScopeFilters`); `FacetsRequest` and `SearchRequest` inherit it.
+- **`422`** when the scope is not declared, is ACL-only, takes a wrong, missing or extra parameter, does more than add where conditions, adds no condition with the given parameters, or reads through a subquery or raw SQL (a relation it would reach escapes the related ACL). The message names the filters path, the scope and the reason (for example `Scope "active" of this entity can be used only in ACLs.`), with the model shown as "this entity" and never a parameter value. `ListRequest` validates the tree (`Rules\ClientScopeFilters`); `FacetsRequest`, `SearchRequest` and `AggregateRequest` inherit it (the aggregate route answers it in its own envelope, `INVALID_FIELD` on `filters`).
 - **The parser is the gate.** `ListRequestData::conformScopeNode()` asserts the client rule for every scope node it builds, because every tree it parses is client input and not every caller validates first. The in-app assistant's CRUD tool builds `ListRequestData` from the model's tool call without a `ListRequest`, so an ACL-only scope is refused there by the same parser.
 - In search the scope is left out of the engine filters and enforced when the hits are reloaded (see [ACL_SYSTEM.md](./ACL_SYSTEM.md#scope-filters-in-search)), so a page can hold fewer records than requested and `totalRecords` can count hits the scope removed.
 
@@ -1129,6 +1133,376 @@ a bounded id subquery (never a join into the aggregated query, so parent scopes
 never collide with related columns), the MorphToMany morph constraint is applied,
 and related soft-deletes are honoured. Content facets `categories` and `tags` this
 way.
+
+## Aggregate Route
+
+`GET|POST /app/crud/aggregate/{module}/{entity}` (route `core.crud.aggregate`) and
+`GET|POST /api/v1/aggregate/{module}/{entity}` (route `core.api.aggregate`) answer "how many, how much, and how it
+changed over time" for one entity. It is a sibling of the [facets](#faceted-counts) route and follows the list's rules:
+
+- The caller needs the `select` permission on the entity, as for the list. Without it the route answers `403`
+  (`401` for the anonymous user), with the usual refusal body of the CRUD routes (`error` is a string).
+- The row-level ACL and the request `filters` bound every figure: a count, a sum or an average never includes a row
+  the list would not show. A relation the request names (in `filters`, as a group or as a label) obeys the related
+  entity's `select` permission and ACL, like any [related record](#related-records).
+- Every field the request names must be a column the caller can read ([readable columns](#columns-returned)). A
+  hidden one is refused, never answered with another number.
+- The response is never cached.
+- On `/api/v1` the route sits behind the same `expose_api` switch, `api` guard and `api` rate limit as the rest of the
+  CRUD API, plus its own limiter ([limits](#aggregate-limits-and-rate-limit)).
+
+The examples below use an illustrative `shop/orders` entity with the columns `status`, `total` (decimal), `currency`,
+`quantity`, `ordered_at` (date-time) and `customer_id`.
+
+### Aggregate request
+
+| Field | Meaning |
+| --- | --- |
+| `measures` | Required list of 1 to `max_measures` objects `{ "fn", "field"? }`. `fn` is `count`, `sum`, `avg`, `min` or `max`. `field` is a column of the entity itself and may be left out only for `count`, which then counts rows. A dotted field is refused (no measure on a related entity) and so is a figure asked twice. A measure is named `count` or `<fn>_<field>` in the result: `sum_total`, `count_total`. |
+| `group_by` | Optional, one dimension `{ "field", "bucket"?, "label"? }`: an own column; a column one `BelongsTo` hop away (`customer.country`), which is its own label; a foreign-key column with `label` naming a relation column (`customer_id` with `customer.name`); or a date column with `bucket` (`day`, `week`, `month`, `quarter`, `year`). |
+| `period` | `{ "field", ... }` over a date column of the entity, with exactly one of `last: { "n", "unit" }`, `preset`, or `from` with `to` ([periods](#aggregate-periods-and-time-zone)). |
+| `filters` | The list vocabulary: conditions, nested AND/OR groups and [model scopes](#scope-filters-in-requests). |
+| `sort` | `{ "by": "measure" \| "key", "dir": "asc" \| "desc" }`; `measure` is the first measure. `by` defaults to `key` for a bucketed group and to `measure` otherwise, and `dir` to `asc` for `key` and `desc` for `measure`. |
+| `limit` | Show only the first N groups of a column (at least 1, at most `max_groups`). |
+| `other` | `true` with a `limit`: add the figures of the groups left out. |
+| `compare` | `"previous_period"` (or `true`): add the figures of the previous period. Needs a `period`. |
+
+```json
+{
+  "measures": [{ "fn": "count" }, { "fn": "sum", "field": "total" }],
+  "group_by": { "field": "status" },
+  "filters": [{ "property": "currency", "operator": "=", "value": "EUR" }],
+  "limit": 2,
+  "other": true
+}
+```
+
+A `GET` caller sends `measures`, `period`, `filters`, `sort` and `group_by` as JSON strings in the query string
+(the client URL-encodes them), `other` as text (`true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off`) and `compare` as
+`previous_period`. A `limit` and the `n` of `last` written as digits are read as the integers they spell:
+
+```
+GET /app/crud/aggregate/shop/orders
+    ?measures=[{"fn":"sum","field":"total"}]
+    &group_by={"field":"ordered_at","bucket":"month"}
+    &period={"field":"ordered_at","last":{"n":6,"unit":"month"}}
+```
+
+Rules of the request, each broken one answering `INVALID_FIELD` on the part that breaks it:
+
+- One grouping dimension: `group_by` is an object, never a list.
+- A bucketed group needs a `period` and must group the period's own field, so the buckets are those of the period.
+  A bucket has no `label`.
+- `limit` and `other` apply only to the groups of a column. A request with no group, or a bucketed one (whose
+  buckets are all shown), cannot carry them. `other` needs a `limit`.
+- `compare` needs a `period`.
+
+`AggregateQuery::fromArray()` is the one validator of the request: the route and any other caller build the same value
+with it, so a request is refused the same way wherever it comes from.
+
+### Aggregate result
+
+```json
+{
+  "data": {
+    "series": [
+      { "key": "paid", "label": null, "values": { "count": 3, "sum_total": 61.25 } },
+      { "key": "shipped", "label": null, "values": { "count": 2, "sum_total": 9.75 } }
+    ],
+    "total": { "count": 6, "sum_total": 171.5 },
+    "other": { "count": 1, "sum_total": 100.5, "groups": 1 }
+  },
+  "meta": {
+    "row_count": 6,
+    "group_count": 3,
+    "truncated": true,
+    "currency": "EUR",
+    "generated_at": "2026-10-21T08:30:00Z"
+  }
+}
+```
+
+- `data.series` is a list of `{ key, label, values }`, one per group, empty when the request has no group. `values`
+  holds one entry per measure, by name. A value is a number, a string or `null`: a decimal is a JSON number, and the
+  `min` or `max` of a date column is the text the database stores (`"2026-01-15 12:00:00"`). `null` is a figure no row
+  gave (`sum`, `avg`, `min`, `max` over no value) or one a [mixed currency](#aggregate-currency) took away.
+- `data.total` is the figures of every row the request covers, not only of the groups shown.
+- `data.other` is flat, `{ <measure names>..., "groups": N }`, and is present only when `other` was asked and some
+  groups were left out. It is computed by the database over the rest of the rows, so the average of the rest is a
+  real average, not derived from the groups shown.
+- `data.compare` is present only when `compare` was asked: `{ total }`, and `series` too for a bucketed request.
+- `meta.row_count` is the number of rows behind `total`. `meta.group_count` is the number of groups (the buckets of
+  a bucketed request, `0` with no group). `meta.truncated` is true when groups were left out of `series`, whether or
+  not `other` shows them.
+- `meta.resolved_period` (`{ field, from, to, timezone }`, the days as `Y-m-d`) is present for a request with a period,
+  and `meta.bucket` for a bucketed one. `meta.currency`, `meta.currencies` and `meta.warnings` are present when the
+  [currency rules](#aggregate-currency) have something to say. `meta.generated_at` is an ISO 8601 UTC moment.
+
+### Aggregate groups
+
+- **An own column** keys a group by the stored value and gives it no label. A `null` value is a group of its own,
+  with the key `null` and no label.
+- **A relation column** (`customer.country`) groups the rows joined to the related table, as the
+  [related-column facets](#related-column-facets) do: one `BelongsTo` hop only, a multi-hop path is refused. The value
+  is its own label (as text). The join is an inner one: a row with no related row, or whose related row the caller
+  may not see, is in `total` but in no group, so `series` plus `other` can add up to less than `total`. Without
+  `select` on the related entity the request is refused like a relation of the list (`403`, `401` for the anonymous
+  user).
+- **A foreign-key column with `label`** (`{ "field": "customer_id", "label": "customer.name" }`) keys the groups by
+  the key and labels the groups shown in one bounded read, under the permission and ACL of the related entity. The
+  label is a column of the `BelongsTo` whose foreign key is the group field, or of a label source the model declares
+  (`ProvidesFacetLabelSources`, translated labels included). A label the caller cannot read falls back to the key.
+- **Order.** `sort.by = key` orders by the value, with the `null` group last in both directions. `sort.by = measure`
+  orders by the first measure, ties broken by key ascending with the `null` group after the groups it ties with. A
+  group whose first measure is `null` sits where the database puts a null.
+- **Limit and rest.** `limit` keeps the first N groups in that order. A `key` sort with a `limit` can fold the `null`
+  group into `other`, since it comes last.
+- **No limit.** A grouping that gives more than `max_groups` groups is `TOO_MANY_GROUPS`, and the message asks to
+  narrow the request or to set a `limit`.
+
+### Aggregate periods and time zone
+
+A period names a date column of the entity (`field`) and gives its days in one of three ways, all of them days of the
+application time zone (`app.timezone`, reported in `meta.resolved_period.timezone`):
+
+| Form | Meaning |
+| --- | --- |
+| `last: { "n", "unit" }` | `n` from 1 to 100000 and `unit` one of `day`, `week`, `month`, `quarter`, `year`. Ends today and starts at the beginning of the unit `n - 1` units before the current one: `last 12 months` is twelve calendar months, the current one included and partial. |
+| `preset` | `today`, `yesterday`, `this_week`, `last_week`, `this_month`, `last_month`, `this_quarter`, `last_quarter`, `this_year`, `last_year`. A `this_*` preset is the whole unit, the days to come included. A week starts on Monday. |
+| `from` and `to` | Two dates, `YYYY-MM-DD`, `from` not after `to`. `to` is inclusive. |
+
+The period becomes a half-open range on the field, `field >= from 00:00:00 and field < to + 1 day`, in `Y-m-d H:i:s`,
+added to the rows the ACL and the filters leave. The stored values are taken to be in the application time zone and
+no conversion is made, which keeps the query portable (no `CONVERT_TZ`, no time zone tables). A per-user time zone
+does not exist.
+
+A malformed period, a field that is not a column of the entity or not a date column, is `INVALID_FIELD` (`period` or
+`period.field`).
+
+**Time buckets.** The database groups the rows by day, with one expression per driver (`Support\DayTruncation`), and
+PHP rolls the days up into the bucket with decimal-safe arithmetic (`BucketRollup`), so money adds up exactly. The key
+of a bucket is the date of its first day, `Y-m-d`, and its `label` is `null`: a week starts on Monday, a quarter on the
+first day of its first month. The first and the last bucket can start outside the period (a period that begins in
+mid-month gets the month bucket keyed by the first of that month), but only the rows of the period are counted.
+
+- Every bucket of the period is in `series`, in the order of the sort (chronological by default). An empty bucket has
+  `count` and `sum` at `0` and `avg`, `min` and `max` at `null`.
+- A bucket's `sum` is the sum of its days, `min` and `max` are taken over the days (numbers as numbers, dates as text),
+  and `avg` is the sum over the number of non-null values, at four decimals rounded half up, so it is weighted by the
+  rows of each day and never an average of daily averages.
+- A series sorted by measure puts a `null` first when ascending, and keeps the chronological order between ties.
+- A stored value the database cannot read as a day fails the request (`500`, reported) instead of leaving the row out
+  of the series while `total` counts it. A day outside the buckets of the period, which a stored value carrying its
+  own offset can give, is left out of the series.
+
+**Comparison.** `compare: "previous_period"` adds the figures of the period of the same length immediately before.
+A period of whole calendar months (it starts on the first day of a month and ends on the last day of a month) shifts by
+that many months: `last_month` is the month before, `this_quarter` the quarter before. Any other period shifts by its own
+length in days: a partial `last 12 months` compares with the 354 days before it, never with twelve months nobody asked
+for.
+
+- `data.compare.total` always exists. `data.compare.series` exists only for a bucketed request and is built by the same
+  rules (every bucket filled), but is **always chronological**, whatever the sort of `series`.
+- `compare.series[i]` stands beside `series[i]` only while `series` is chronological, which is the default. When the
+  request sorts `series` by a measure, or by key descending, a consumer aligns the two by key.
+- The two series are as long as their periods have buckets: when the period is not whole months, the previous one can
+  have one bucket more or fewer.
+- The previous period obeys `max_points` too (`PERIOD_TOO_LONG`, the message starts with "The previous period"). A
+  mixed currency is looked for in the previous period as well.
+
+A bucketed request with a comparison (`period: { "field": "ordered_at", "from": "2026-04-01", "to": "2026-06-30" }`,
+`group_by: { "field": "ordered_at", "bucket": "month" }`, `measures: [{ "fn": "count" }]`):
+
+```json
+{
+  "data": {
+    "series": [
+      { "key": "2026-04-01", "label": null, "values": { "count": 1 } },
+      { "key": "2026-05-01", "label": null, "values": { "count": 0 } },
+      { "key": "2026-06-01", "label": null, "values": { "count": 3 } }
+    ],
+    "total": { "count": 4 },
+    "compare": {
+      "total": { "count": 3 },
+      "series": [
+        { "key": "2026-01-01", "label": null, "values": { "count": 1 } },
+        { "key": "2026-02-01", "label": null, "values": { "count": 0 } },
+        { "key": "2026-03-01", "label": null, "values": { "count": 2 } }
+      ]
+    }
+  },
+  "meta": {
+    "resolved_period": { "field": "ordered_at", "from": "2026-04-01", "to": "2026-06-30", "timezone": "Europe/Rome" },
+    "bucket": "month",
+    "row_count": 4,
+    "group_count": 3,
+    "truncated": false,
+    "generated_at": "2026-10-21T08:30:00Z"
+  }
+}
+```
+
+### Aggregate measurable columns
+
+`Support\ColumnKinds` says what a column is: `numeric`, `temporal` or `other`. The cast of the model decides first
+(`int`, `integer`, `float`, `double`, `real`, `decimal` are numeric; `date`, `datetime`, `immutable_date`,
+`immutable_datetime`, `timestamp` are temporal) and the schema type second, with its precision cut
+(`decimal(15,4)` is `decimal`) and the PostgreSQL names (`int4`, `float8`) known. `tinyint` is never numeric, because
+MySQL stores a boolean in it. A temporal cast on a column the schema stores as a number (unix seconds cast as
+`timestamp`) is neither a date column nor a number.
+
+| Function | Accepts |
+| --- | --- |
+| `count` | Any column the caller can read, or no field (all rows). A `count` over a field counts its non-null values. |
+| `min`, `max` | A numeric or a temporal column, a key included. |
+| `sum`, `avg` | A numeric column that is not a key: neither a primary key (every column of a composite one) nor the local side of a foreign key. |
+
+Anything else is `NOT_MEASURABLE`. A name that is not a column of the table (an accessor, a relation, a dotted path)
+is `INVALID_FIELD`, a column the caller cannot read is `UNREADABLE_FIELD`.
+
+### Aggregate currency
+
+`Support\CurrencyColumns` pairs an amount with its currency by name: an amount `<x>_<suffix>` takes the column
+`currency_<suffix>` when the table has it, and otherwise the column `currency`. A field with no underscore is paired
+by its whole name (`total` takes `currency_total`, then `currency`). A table with neither has no currency to check.
+
+Only `sum`, `avg`, `min` and `max` over a numeric column that is not a key, on a table that has a paired currency
+column, are amounts. The rule is by type, not by meaning: a `sum(quantity)` on a table with a `currency` column is
+treated as an amount too (a known false positive), while `count`, dates and keys never are. Nothing is converted.
+
+- A figure whose rows hold more than one currency is `null`: a group, a bucket, `other`, the total, and the figures
+  of the previous period alike. One warning per measure, however many cells mix, goes to `meta.warnings` as
+  `{ "code": "MIXED_CURRENCY", "field": "<measure name>", "message": "..." }`, and `meta.currencies` lists the
+  currencies of the rows of the result (at most 20, ascending) when its total is mixed. `meta.currency` is absent.
+- A cell with one currency keeps its value. When the whole result has one currency, and no cell mixes,
+  `meta.currency` carries it.
+- `null` and the **empty string** are not currencies: rows with one of them are ignored like `NULL`, a cell with one
+  currency beside such rows keeps its value, and a cell with only such rows has no currency. Values are not trimmed: a
+  value of spaces still counts as a currency, and a padded `'EUR '` next to `'EUR'` counts as two.
+- **Grouping by the currency column of the amount** (`group_by: { field: "currency" }`) makes every group
+  single-currency: the group values stay numbers, but `total` and `other`, which add the groups, are `null`, **without
+  a warning**, and the result has no `meta.currency`. A `null` total with `meta.row_count > 0` and no warning means the
+  groups are the currencies.
+- A mix found only in the previous period gives a warning and a `null` in `compare`, but no `meta.currencies` and no
+  `meta.currency`.
+
+```json
+{
+  "data": { "series": [], "total": { "count": 3, "sum_total": null } },
+  "meta": {
+    "row_count": 3,
+    "group_count": 0,
+    "truncated": false,
+    "currencies": ["EUR", "USD"],
+    "warnings": [
+      {
+        "code": "MIXED_CURRENCY",
+        "field": "sum_total",
+        "message": "\"sum_total\" adds amounts in more than one currency, so it has no value: group by \"currency\" to get one value per currency."
+      }
+    ],
+    "generated_at": "2026-10-21T08:30:00Z"
+  }
+}
+```
+
+### Aggregate limits and rate limit
+
+The `aggregate` block of `config/config.php` (`core.aggregate.*`) holds the ceilings. Each is set from an environment
+variable (see the Core README); a value below 1 or not numeric falls back to its default, so a wrong setting never
+switches a limit off. The ceilings are checked before any query runs, except the number of groups of a request with no
+`limit`, which one count query settles.
+
+| Key | Default | Effect |
+| --- | --- | --- |
+| `max_measures` | `3` | Measures one request may hold. More is `INVALID_FIELD` on `measures`. |
+| `max_groups` | `50` | Groups of a column one request may show. A `limit` above it is `TOO_MANY_GROUPS` on `limit`; with no `limit`, a grouping that gives more groups is `TOO_MANY_GROUPS` on `group_by.field`. |
+| `max_points` | `400` | Buckets of one series, the previous period's series included. More is `PERIOD_TOO_LONG` on `group_by.bucket`, and the message names a coarser bucket that fits or asks for a shorter period. |
+| `max_period_days` | `1096` | Days of the requested period, both ends counted. More is `PERIOD_TOO_LONG` on `period`. The previous period is not measured by it. |
+| `max_objects_per_message` | `6` | Not read by the route. It caps the objects the in-app assistant may show in one message; it is only carried by `AggregateLimits` (no consumer yet). |
+| `rate_per_minute` | `60` | Requests a minute to the route, per user. |
+
+The rate is a named limiter, `aggregate`, defined next to the `api` limiter in `CoreServiceProvider` and attached by
+`throttle:aggregate` in `routes/crud.php`, so it covers `/app` and `/api/v1` alike (on `/api/v1` it adds to the `api`
+limiter). It counts per signed-in user, and per client address for the anonymous user, a user with no email, or no user
+at all. The ceiling is read when a request arrives. Over it the route answers `429` with Laravel's default `{ message }`
+body, outside the `{ error }` envelope of this route.
+
+There is no hard timeout in v1: the code `TIMEOUT` is reserved and never emitted.
+
+### Aggregate errors
+
+A refusal of the contract is a `422` with `{ "error": { "code", "message", "field"? } }`. `field` is the path of the part
+of the request that caused it: `measures.0.fn`, `measures.1.field`, `group_by.field`, `group_by.bucket`, `group_by.label`,
+`period`, `period.field`, `sort.by`, `limit`, `other`, `compare`, `filters.<property>`.
+
+| Code | When |
+| --- | --- |
+| `INVALID_FIELD` | A malformed request (the first message and first key of the validation), a field that is not a column of the entity (or of a to-one relation, for a group), a period or bucket field that is not a date column, a bucket without a period or on another field than the period's, a combination the rules above refuse. |
+| `UNREADABLE_FIELD` | The caller cannot read the field. A filter column is reported as `filters.<property>`. |
+| `NOT_MEASURABLE` | The function does not suit the column (`sum` of a string or of a key, `min` of a string). |
+| `UNSUPPORTED_FUNCTION` | `fn` is not one of the five (`measures.N.fn`), or the database driver has no day expression for a bucket (`group_by.bucket`). |
+| `TOO_MANY_GROUPS` | A `limit`, or an unlimited grouping, above `max_groups`. |
+| `PERIOD_TOO_LONG` | A period above `max_period_days`, or a series above `max_points`. |
+| `TIMEOUT` | Reserved, never emitted. |
+
+`MIXED_CURRENCY` is in the enum but is a warning of a `200`, not an error.
+
+Other answers:
+
+- **Filters.** A filter column the caller cannot read is `UNREADABLE_FIELD` on `filters.<property>`, and an unknown plain
+  column (or the JSON path of one) is `INVALID_FIELD` there. A property the list reads from outside the columns
+  (a translated or a dynamic field) still narrows the figures. A dotted path is checked for readability only: an
+  unknown column at its end is not refused up front, as in the list. A scope filter the list refuses (an undeclared
+  scope, for instance) is `INVALID_FIELD` on `filters`.
+- **`403` and `401`.** A missing `select` permission, or a related entity the caller may not select.
+- **An `InvalidArgumentException`** from the list machinery (its guards name fields, never SQL) is `422` `INVALID_FIELD`
+  with its message and no `field`, and is logged at notice level (`Aggregate request refused`, with the exception
+  class, message, module and entity).
+- **A deployment fault** (an unsupported database driver for a bucket) is the same `422`, and is also reported to the log
+  at error level. A client fault is not logged.
+- **`500`.** Any other failure answers `{ "error": { "message": "The aggregate could not be computed." } }`, with no
+  exception text (a failed query's message holds its SQL) whatever `app.debug` says. The exception is reported.
+- **`429`.** Over the rate, as above.
+
+### Aggregate database support
+
+SQL never receives a field of the request as text: a field is used only once it is a column of the model (or of the model
+a to-one relation reaches), qualified by its table and wrapped by the grammar of the connection; functions and buckets
+are closed lists; figures are selected under positional aliases (`m0`, `m1`) and named in PHP.
+
+The day expression of a bucket is `date(col)` (sqlite), `DATE(col)` (mysql, mariadb), `CAST(col AS date)` (pgsql,
+sqlsrv) and `TRUNC(col)` (oracle). A bucket on any other driver is refused before any query. The tests and CI run on
+SQLite only: the other expressions are covered as generated strings, and the engine still needs a run against a real
+MySQL and PostgreSQL server before the route is called supported there.
+
+Known limits:
+
+- On SQLite, a `date` column that holds a bare `Y-m-d` written outside Eloquent loses the first day of a period and
+  gains the day after `to`, because the bounds are compared as text in `Y-m-d H:i:s`. MySQL and PostgreSQL compare it
+  correctly.
+- The engine groups by one dimension, with no measure on a related entity, no distinct counts and no currency
+  conversion.
+- A `sum(quantity)` is treated as an amount when the table has a currency column.
+
+### Aggregate code map
+
+Paths are under `app/`.
+
+| Piece | Role |
+| --- | --- |
+| `Http/Requests/AggregateRequest` | Extends `ListRequest`. Shape rules, the JSON strings of a `GET`; a failed validation is an `AggregateException`. |
+| `Services/Crud/Aggregate/AggregateQuery` | The validated request as a value (with `AggregateMeasure`, `AggregateGroup`), shared by every caller. `canonical()` gives one string for two spellings of a request. |
+| `Services/Crud/CrudService::aggregate()` | Permission, the field and filter checks, then the engine over an `AggregateScope` of closures on the facets' helpers (ACL query, list filters, related visibility, labels). |
+| `Services/Crud/Aggregate/AggregateEngine` | Dispatches to the ungrouped, column-group and bucketed paths. |
+| `PeriodPlan`, `AggregatePeriod`, `PeriodComparison`, `BucketSeries`, `BucketRollup` | The period, the bucket series, the previous period and the decimal roll-up. |
+| `MeasureSql`, `CurrencyCheck` | The SQL of the measures and the currency partials, and the mixed-currency rule. |
+| `Support/ColumnKinds`, `CurrencyColumns`, `DayTruncation` | What a column is, which column holds the currency of an amount, and the driver expression for a day. |
+| `Exceptions/AggregateException`, `Enums/AggregateErrorCode` | The refusal: a code, a message without SQL, a `field`, and whether it is a deployment fault to report. |
+| `Services/Crud/Aggregate/AggregateLimits` | The `core.aggregate.*` ceilings. |
+
+Contract covered by `tests/Feature/Controllers/CrudAggregateTest.php` and the `Aggregate*` tests of
+`tests/Integration` and `tests/Unit`.
 
 ## List Freshness
 

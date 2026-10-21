@@ -37,7 +37,7 @@ The Core Module contains all the necessary functionalities to build a new Larave
 -   [Event orchestration](docs/EVENT_ORCHESTRATION.md): cross-module indexing and moderation events.
 -   Transactional outbox: durable cross-system integration events with an application-replaceable publisher and queued delivery.
 -   [ACL system](docs/ACL_SYSTEM.md): permission and row-level access control behavior.
--   [CRUD system](docs/CRUD_SYSTEM.md): generic CRUD pipeline and API behavior.
+-   [CRUD system](docs/CRUD_SYSTEM.md): generic CRUD pipeline and API behavior, including the facets and the aggregate route.
 -   [API access control](docs/rag/API_ACCESS_CONTROL.md): guards, the `expose_api` switch, token authentication, default roles, related-record visibility, media projection, personal tokens and service accounts.
 -   [Module import framework](docs/IMPORT_FRAMEWORK.md): abstract command and neutral services for module-owned external importers.
 
@@ -211,6 +211,19 @@ These are config keys under `core.` (set them in the Core config, `Modules/Core/
 | `core.media.signed_url_ttl_minutes` | `60` | Minutes a temporary media URL of the `api` projection stays valid, on a disk whose driver can sign URLs. |
 
 The anonymous account is the user named by `GUEST_USER` (default `anonymous`). See [docs/rag/API_ACCESS_CONTROL.md](docs/rag/API_ACCESS_CONTROL.md) for the behaviour behind these keys.
+
+### Aggregate route configuration
+
+The CRUD aggregate route (`GET|POST /app/crud/aggregate/{module}/{entity}`, also under `/api/v1`) is bounded by the ceilings below. Each one is an environment variable read by the `aggregate` block of `Modules/Core/config/config.php`, as the config key `core.aggregate.*`. A value below 1 or not numeric is replaced by its default, so a wrong setting never switches a limit off. The behaviour behind them, and the errors they raise, are in [docs/CRUD_SYSTEM.md](docs/CRUD_SYSTEM.md#aggregate-route).
+
+| Variable | Config key | Default | Meaning |
+|----------|------------|---------|---------|
+| `CORE_AGGREGATE_MAX_MEASURES` | `core.aggregate.max_measures` | `3` | Measures one request may compute. |
+| `CORE_AGGREGATE_MAX_GROUPS` | `core.aggregate.max_groups` | `50` | Groups one request may return. A `limit` above it, or a grouping that gives more groups with no `limit`, is `TOO_MANY_GROUPS`. |
+| `CORE_AGGREGATE_MAX_POINTS` | `core.aggregate.max_points` | `400` | Points one result may hold: a bucketed period gives one point per bucket, the previous period's series included. More is `PERIOD_TOO_LONG`. |
+| `CORE_AGGREGATE_MAX_PERIOD_DAYS` | `core.aggregate.max_period_days` | `1096` | Longest period one request may span, in days. More is `PERIOD_TOO_LONG`. |
+| `CORE_AGGREGATE_MAX_OBJECTS_PER_MESSAGE` | `core.aggregate.max_objects_per_message` | `6` | Objects (widgets) the in-app assistant may show in one message. The route does not read it. |
+| `CORE_AGGREGATE_RATE_PER_MINUTE` | `core.aggregate.rate_per_minute` | `60` | Aggregate requests a minute per user (per client address for the anonymous user), through the `aggregate` limiter. Over it the route answers `429`. |
 
 ### Versioning configuration
 
@@ -712,6 +725,7 @@ The Core Module utilizes several packages to enhance its functionality. Below is
 
 -   Feature toggles: `FORCE_HTTPS`. User and CRUD toggles are runtime settings (Filament > Settings), not env vars: `auth.email_verification.enabled`, `auth.registration.enabled`, `auth.two_factor.enabled`, `auth.licenses.enabled`, `auth.social_login.enabled`, `auth.passkeys.enabled`, `crud.dynamic_entities`, `expose_api` (gates every `/api` route, Core and modules), `soft_deletes.expiration_days` (0 = never purge), `search.vector.enabled` (embeddings generation requires AI module). Search ranking is tuned from the `search` settings group too: `search.reranker.enabled`, `search.reranker.top_k`, `search.reranker.weight` (rerank blend, seeded `0.6`) and `search.adaptive_tuning` (seeded off: applies the committed `config/search_tuning.php` profile per query class; see `docs/rag/SEARCH_RETRIEVAL_PIPELINE.md`). Settings are listed without the module prefix (the module is a column) and read from config as `core.<name>`.
 -   Data retention: `CORE_MEDIA_DRAFT_TTL_HOURS` (pending-media draft TTL, default 24), `CORE_VALIDITY_EXPIRING_WITHIN_HOURS` (lead time for the `expiring` scope, default 48).
+-   CRUD aggregate route: `CORE_AGGREGATE_MAX_MEASURES` (default 3), `CORE_AGGREGATE_MAX_GROUPS` (50), `CORE_AGGREGATE_MAX_POINTS` (400), `CORE_AGGREGATE_MAX_PERIOD_DAYS` (1096), `CORE_AGGREGATE_MAX_OBJECTS_PER_MESSAGE` (6) and `CORE_AGGREGATE_RATE_PER_MINUTE` (60); see [Aggregate route configuration](#aggregate-route-configuration).
 -   Standard stack: `DB_*`, `REDIS_*`, `SESSION_*`, `CACHE_STORE=redis`, `CACHE_PREFIX`, `QUEUE_CONNECTION=redis`, `HORIZON_MEMORY_LIMIT`, `FILESYSTEM_DISK`, `LOG_*`.
 
 ### Additional Functionalities

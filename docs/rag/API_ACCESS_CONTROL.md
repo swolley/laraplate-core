@@ -66,8 +66,11 @@ legitimate tokens behind one address (a factory network) are limited only by the
 | Relation the caller may not read, explicitly requested | same rule as the two lines above |
 | Name in the request that is not a relation, a declared computed method or an attribute accessor | `400` |
 | Facet field, group-by key, sort, filter property or aggregated column the caller does not receive | `400` |
+| Field of an aggregate request (measure, group key, label, period field, filter property) the caller does not receive | `422` `UNREADABLE_FIELD`, in the aggregate route's own `{ "error": { "code", "message", "field" } }` envelope |
 | Server error (`app.debug` off: the status text only, never the exception message) | `5xx` |
+| Server error on the aggregate route (any `app.debug`) | `500` `{ "error": { "message": "The aggregate could not be computed." } }`, never the exception message |
 | Too many requests, or too many failed authentications | `429` |
+| Too many aggregate requests (`core.aggregate.rate_per_minute` a minute per user, per client address for the anonymous user) | `429`, Laravel's default `{ "message" }` body |
 
 ### Routes that carry their own credential
 
@@ -120,7 +123,7 @@ response cache. A row that stops being valid stays visible for at most the confi
 
 ## Related records obey their own permission and ACL
 
-Select, detail, search, tree, history and facets apply one visibility rule: a relation to an independent entity is
+Select, detail, search, tree, history, facets and aggregate apply one visibility rule: a relation to an independent entity is
 loaded only if the caller holds that entity's `select` permission on the request's guard, and the related ACL narrows it,
 exactly as it narrows a root query. The rule holds for `relations`, dotted `columns`, relation filters, sorts, group-by
 keys and aggregates.
@@ -189,6 +192,18 @@ applied when the hits are reloaded from the database. A search page can therefor
 `totalRecords` of a search can count hits the caller may not see. Relations of the reloaded records go through the same
 authorizer and black list as select.
 
+### Aggregate
+
+The aggregate route (`GET|POST /app/crud/aggregate/{module}/{entity}` and `/api/v1/aggregate/{module}/{entity}`, route
+names `core.crud.aggregate` and `core.api.aggregate`) computes counts, sums, averages, minima and maxima, by group or by
+time bucket. It adds no permission: it needs the `select` permission on the entity, on the request's guard and within the
+token's abilities, as the list does (`403`, `401` for the anonymous user). The row-level ACL and the request filters bound
+every figure, so a total never includes a row the list would not show, and an anonymous `api` caller aggregates only what
+the `api` guest may select, narrowed by its ACL. A relation used in a filter, as a group (`customer.country`) or as a group
+label must be one the caller may select, and the related ACL narrows it as it narrows a root query. Every field of the
+request must be a column the caller receives (see Readable columns). The route is under the `expose_api` switch with the
+rest of `/api/v1`, and carries its own limiter on top of the `api` one. Developer reference: `docs/CRUD_SYSTEM.md#aggregate-route`.
+
 ## Scope filters in ACLs
 
 An ACL (and a client request, see below) can name a **model scope** instead of repeating its conditions:
@@ -250,7 +265,9 @@ What the serialization withholds cannot be read through the query either: counts
 it. A facet field (flat `columns`, or an open facet's `groupBy`, `fields`, `labelField` and `relation`), a `group_by`
 key, a `sort`, a filter property or an aggregated column (`sum`, `average`, `min`, `max` of a related column) that
 names a column the caller does not receive answers `400` before anything is queried. A dotted path is checked on each
-model along it. The rule (`Support\ReadableColumnGuard`) is:
+model along it. The aggregate route applies the same rule to every field of its request (measure, group key, label, period
+field, filter property) and answers `422` `UNREADABLE_FIELD` with the path of the field (`measures.0.field`,
+`filters.<property>`) instead of `400`. The rule (`Support\ReadableColumnGuard`) is:
 
 - the anonymous user may not name an attribute or relation the model lists in `anonymousHiddenAttributes()`
   (`facets/cms/comments?columns[]=user_id`, `contributors.shared_components`);
@@ -349,7 +366,8 @@ backoffice refuses the flag on an account named like the guest.
    payment and e-invoice callbacks, SAO webhooks and MES machine data.
 2. Review what the `api` guest and any `api` role you created can read; each role's grants and ACLs are the only exposure.
 3. Set `core.api.rate_limit_per_minute`, `core.api_tokens.max_lifetime_days` and `core.media.signed_url_ttl_minutes` if
-   the defaults do not fit (config keys, no env variable).
+   the defaults do not fit (config keys, no env variable). The aggregate route has its own ceilings and rate, set by
+   the `CORE_AGGREGATE_*` environment variables (see the Core README).
 4. After pulling this behaviour into an existing installation, rebuild it with `php artisan migrate:fresh --seed`: there is
    no migration of roles or permissions, and re-seeding never revokes grants. An installation that is only re-seeded keeps
    the old `guest` role on `web` with its `select` permissions, which no longer matter to `/api` but still let an
@@ -371,6 +389,8 @@ backoffice refuses the flag on an account named like the guest.
 - Why does a media come back without `custom_properties` on the API?
 - Why does a facet, sort or filter on `user_id` answer 400 to the anonymous user?
 - Why does a server error say only "Internal Server Error"?
+- Why does an aggregate answer 422 `UNREADABLE_FIELD` where a facet answers 400?
+- Why does an aggregate answer 500 with "The aggregate could not be computed." and no detail?
 - Why does a filter `{"scope": "active"}` answer 422 in a request but work in an ACL?
 - Why does a read answer 403 after a model scope was renamed?
 - Why can a search page hold fewer records than requested when an ACL uses a scope?

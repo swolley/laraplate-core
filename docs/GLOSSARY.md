@@ -42,6 +42,9 @@ Canonical English names for Core platform entities. Use these terms in code, API
 | **ResponseBuilder** | Formats `CrudResult` to JSON/XML with optional caching. |
 | **FiltersGroup** | Nested AND/OR filter tree applied by `QueryBuilder`. |
 | **CrudResult** | Service result envelope: data rows + pagination/meta. |
+| **AggregateQuery** | The validated request of the aggregate route as a value (measures, one group, period, sort, limit, `other`, `compare`); built by `AggregateRequest` and by any other caller through `fromArray()`. |
+| **AggregateEngine** | Runs an `AggregateQuery` over the rows the ACL and the list filters leave, and returns counts, sums, averages, minima and maxima by group or time bucket. |
+| **AggregateException** | Refusal of the aggregate route: a contract code (`INVALID_FIELD`, `UNREADABLE_FIELD`, ...), a message without SQL and the `field` that caused it; answers `422`. |
 
 ## Dynamic entity stack
 
