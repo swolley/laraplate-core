@@ -13,10 +13,11 @@ use Modules\Core\Exceptions\AggregateException;
  * Every request with a comparison gets the total of the previous period; a bucketed one gets its series too,
  * built by the same rules as the current one (every bucket filled) but always in the order of the calendar,
  * whatever the sort of the request (ruling P16): pairing two series by position only means something on the
- * calendar axis. So `compare.series[i]` stands beside `series[i]` only while `series` is chronological too, which
- * is the default sort of a bucketed request; a series sorted by a measure, or by key descending, is put back in the
- * order of its keys before it is paired. The two series are as long as their periods have buckets: a period that
- * is not whole months can start or end its previous one in a partial bucket more or less.
+ * calendar axis. So `compare.series` is chronological, and `compare.series[i]` stands beside `series[i]` only
+ * while `series` is chronological too, which is the default sort of a bucketed request. The engine does not
+ * re-sort `series`: when the request sorts it by a measure, or by key descending, a consumer must align the two by
+ * key, not by position. The two series are as long as their periods have buckets: a period that is not whole
+ * months can start or end its previous one in a partial bucket more or less.
  */
 final class PeriodComparison
 {
