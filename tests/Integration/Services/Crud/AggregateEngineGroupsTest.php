@@ -384,17 +384,19 @@ it('other is left out when no group was left out', function (): void {
 });
 
 it('the rest leaves out a null group that is shown', function (): void {
+    $rossi = aggregate_groups_customer('Rossi');
+    $dupont = aggregate_groups_customer('Dupont');
     AggregateTestKit::seedOrders([
-        ['currency' => null, 'total' => '1.5'],
-        ['currency' => 'EUR', 'total' => '10.5'],
-        ['currency' => null, 'total' => '1.5'],
-        ['currency' => 'USD', 'total' => '20.5'],
-        ['currency' => null, 'total' => '1.5'],
+        ['customer_id' => null, 'total' => '1.5'],
+        ['customer_id' => $rossi->id, 'total' => '10.5'],
+        ['customer_id' => null, 'total' => '1.5'],
+        ['customer_id' => $dupont->id, 'total' => '20.5'],
+        ['customer_id' => null, 'total' => '1.5'],
     ]);
 
     $result = aggregate_groups([
         'measures' => [['fn' => 'count'], ['fn' => 'sum', 'field' => 'total']],
-        'group_by' => ['field' => 'currency'],
+        'group_by' => ['field' => 'customer_id'],
         'limit' => 1,
         'other' => true,
     ]);

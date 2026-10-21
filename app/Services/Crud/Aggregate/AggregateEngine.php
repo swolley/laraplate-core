@@ -28,7 +28,8 @@ use Modules\Core\Support\ColumnKinds;
  * The engine dispatches a request to its path: ungrouped, grouped by the value of a column (here), or grouped by a
  * time bucket ({@see BucketSeries}). A period ({@see PeriodPlan}) is resolved and checked before any query and
  * narrows the rows of every path; a comparison ({@see PeriodComparison}) runs the same total, and for a bucket the
- * same series, over the previous period.
+ * same series, over the previous period. Every path selects the currency partials of its amounts, and a cell that
+ * adds amounts of more than one currency has no value there ({@see CurrencyCheck}).
  *
  * @phpstan-type Figures array{
  *     series: list<array{key: mixed, label: ?string, values: array<string, int|float|string|null>}>,
@@ -66,25 +67,29 @@ final class AggregateEngine
 
         $plan = PeriodPlan::resolve($scope->model, $query, $this->limits, $now);
         $rows = $plan instanceof PeriodPlan ? PeriodPlan::narrow($scope, $plan->current) : $scope;
+        $currency = CurrencyCheck::for($scope->model, $query);
 
         if ($plan instanceof PeriodPlan && $plan->bucket instanceof TimeBucket) {
-            $figures = $this->bucketed($rows, $query, $plan->current, $plan->bucket);
+            $figures = $this->bucketed($rows, $query, $plan->current, $plan->bucket, $currency);
         } elseif ($query->group instanceof AggregateGroup) {
-            $figures = $this->grouped($rows, $query, $query->group);
+            $figures = $this->grouped($rows, $query, $query->group, $currency);
         } else {
-            $figures = $this->ungrouped($rows, $query);
+            $figures = $this->ungrouped($rows, $query, $currency);
         }
+
+        $compare = $plan instanceof PeriodPlan ? PeriodComparison::read($scope, $query, $plan, $currency) : null;
 
         return new AggregateResult(
             series: $figures['series'],
             total: $figures['total'],
             other: $figures['other'],
-            compare: $plan instanceof PeriodPlan ? PeriodComparison::read($scope, $query, $plan) : null,
+            compare: $compare,
             meta: [
                 ...($plan instanceof PeriodPlan ? $plan->meta() : []),
                 'row_count' => $figures['row_count'],
                 'group_count' => $figures['group_count'],
                 'truncated' => $figures['truncated'],
+                ...$currency->meta($rows),
                 'generated_at' => $now->toIso8601ZuluString(),
             ],
         );
@@ -114,9 +119,9 @@ final class AggregateEngine
      *
      * @return Figures
      */
-    private function ungrouped(AggregateScope $scope, AggregateQuery $query): array
+    private function ungrouped(AggregateScope $scope, AggregateQuery $query, CurrencyCheck $currency): array
     {
-        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures);
+        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures, $currency);
 
         return ['series' => [], 'total' => $total, 'other' => null, 'row_count' => $row_count, 'group_count' => 0, 'truncated' => false];
     }
@@ -129,10 +134,10 @@ final class AggregateEngine
      *
      * @return Figures
      */
-    private function bucketed(AggregateScope $scope, AggregateQuery $query, AggregatePeriod $period, TimeBucket $bucket): array
+    private function bucketed(AggregateScope $scope, AggregateQuery $query, AggregatePeriod $period, TimeBucket $bucket, CurrencyCheck $currency): array
     {
-        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures);
-        $series = BucketSeries::read($scope, $query, $period, $bucket);
+        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures, $currency);
+        $series = BucketSeries::read($scope, $query, $period, $bucket, $currency);
 
         return ['series' => $series, 'total' => $total, 'other' => null, 'row_count' => $row_count, 'group_count' => count($series), 'truncated' => false];
     }
@@ -149,7 +154,7 @@ final class AggregateEngine
      *
      * @return Figures
      */
-    private function grouped(AggregateScope $scope, AggregateQuery $query, AggregateGroup $group): array
+    private function grouped(AggregateScope $scope, AggregateQuery $query, AggregateGroup $group, CurrencyCheck $currency): array
     {
         ['rows' => $rows, 'column' => $column, 'keyIsLabel' => $key_is_label] = $this->groupSource($scope, $group);
 
@@ -163,9 +168,9 @@ final class AggregateEngine
             );
         }
 
-        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures);
+        ['values' => $total, 'row_count' => $row_count] = MeasureSql::totals($scope, $query->measures, $currency);
 
-        $groups = $this->groupRows($scope->model, $rows(), $column, $query);
+        $groups = $this->groupRows($scope->model, $rows(), $column, $query, $currency);
         $keys = array_column($groups, 'key');
         $labels = $this->labels($scope, $group, $key_is_label, $keys);
 
@@ -180,9 +185,9 @@ final class AggregateEngine
 
         if ($query->other && $truncated) {
             $rest = $this->rest($rows(), $column, $keys);
-            $rest_row = (array) $rest->select(MeasureSql::select($scope->model, $rest->getGrammar(), $query->measures))->first();
+            $rest_row = (array) $rest->select(MeasureSql::select($scope->model, $rest->getGrammar(), $query->measures, $currency))->first();
 
-            $other = [...MeasureSql::figures($rest_row, $query->measures), 'groups' => $group_count - count($series)];
+            $other = [...$currency->settle([$rest_row], MeasureSql::figures($rest_row, $query->measures)), 'groups' => $group_count - count($series)];
         }
 
         return ['series' => $series, 'total' => $total, 'other' => $other, 'row_count' => $row_count, 'group_count' => $group_count, 'truncated' => $truncated];
@@ -265,9 +270,9 @@ final class AggregateEngine
      *
      * @return list<array{key: mixed, values: array<string, int|float|string|null>}>
      */
-    private function groupRows(Model $model, BaseQueryBuilder $rows, string $column, AggregateQuery $query): array
+    private function groupRows(Model $model, BaseQueryBuilder $rows, string $column, AggregateQuery $query, CurrencyCheck $currency): array
     {
-        $rows->select([$column . ' as ' . self::GROUP_KEY_ALIAS, ...MeasureSql::select($model, $rows->getGrammar(), $query->measures)])
+        $rows->select([$column . ' as ' . self::GROUP_KEY_ALIAS, ...MeasureSql::select($model, $rows->getGrammar(), $query->measures, $currency)])
             ->groupBy($column);
 
         if ($query->sortBy === 'key') {
@@ -284,7 +289,7 @@ final class AggregateEngine
 
         foreach ($rows->get() as $row) {
             $row = (array) $row;
-            $groups[] = ['key' => $row[self::GROUP_KEY_ALIAS] ?? null, 'values' => MeasureSql::figures($row, $query->measures)];
+            $groups[] = ['key' => $row[self::GROUP_KEY_ALIAS] ?? null, 'values' => $currency->settle([$row], MeasureSql::figures($row, $query->measures))];
         }
 
         return $groups;

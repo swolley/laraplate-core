@@ -19,23 +19,24 @@ final class PeriodComparison
 {
     /**
      * The figures of the previous period of the plan over the rows of the scope, or null when the request does
-     * not compare. The scope is the one of the request, not narrowed to its period.
+     * not compare. The scope is the one of the request, not narrowed to its period. Its cells are checked for mixed
+     * currencies like those of the result.
      *
      * @throws AggregateException
      *
      * @return array{total: array<string, int|float|string|null>, series?: list<array{key: string, label: null, values: array<string, int|float|string|null>}>}|null
      */
-    public static function read(AggregateScope $scope, AggregateQuery $query, PeriodPlan $plan): ?array
+    public static function read(AggregateScope $scope, AggregateQuery $query, PeriodPlan $plan, CurrencyCheck $currency): ?array
     {
         if (! $plan->previous instanceof AggregatePeriod) {
             return null;
         }
 
         $rows = PeriodPlan::narrow($scope, $plan->previous);
-        $compare = ['total' => MeasureSql::totals($rows, $query->measures)['values']];
+        $compare = ['total' => MeasureSql::totals($rows, $query->measures, $currency, previous: true)['values']];
 
         if ($plan->bucket instanceof TimeBucket) {
-            $compare['series'] = BucketSeries::read($rows, $query, $plan->previous, $plan->bucket);
+            $compare['series'] = BucketSeries::read($rows, $query, $plan->previous, $plan->bucket, $currency);
         }
 
         return $compare;

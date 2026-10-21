@@ -8,8 +8,9 @@ namespace Modules\Core\Services\Crud\Aggregate;
  * The figures of an aggregate request, in the shape of the contract: a series of groups, the total over every
  * row, the rest of the groups beyond a limit, the previous period and the facts about how they were computed.
  *
- * A figure is a number, or null when no row gave it (ruling R8). The minimum or the maximum of a date-time
- * column is the text the database holds, in the application time zone.
+ * A figure is a number, or null when no row gave it (ruling R8) or when the rows of its cell hold amounts in more
+ * than one currency (`meta.warnings`, {@see CurrencyCheck}). The minimum or the maximum of a date-time column is the
+ * text the database holds, in the application time zone.
  */
 final readonly class AggregateResult
 {

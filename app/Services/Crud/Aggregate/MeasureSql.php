@@ -18,7 +18,8 @@ use UnexpectedValueException;
  *
  * A function is one of a closed list and a field is used only once it is a column of the model, then qualified by
  * its table and wrapped by the grammar of the connection. A figure is selected under a positional alias (`m0`,
- * `m1`, ...) and named after its measure in PHP, so no text of the request reaches SQL.
+ * `m1`, ...) and named after its measure in PHP, so no text of the request reaches SQL. The currency partials of
+ * the amounts ({@see CurrencyCheck}) travel in the same queries.
  */
 final class MeasureSql
 {
@@ -39,27 +40,34 @@ final class MeasureSql
      * and an ORDER BY on a plain column next to an aggregate function is refused by MySQL (only_full_group_by)
      * and by PostgreSQL.
      *
+     * The total of the rows of the result is the one whose mix of currencies the result names; the total of the
+     * previous period ($previous) is checked like any other cell but is not named there.
+     *
      * @param  list<AggregateMeasure>  $measures
      *
      * @throws AggregateException
      *
      * @return array{values: array<string, int|float|string|null>, row_count: int}
      */
-    public static function totals(AggregateScope $scope, array $measures): array
+    public static function totals(AggregateScope $scope, array $measures, CurrencyCheck $currency, bool $previous = false): array
     {
         $query = ($scope->baseQuery)()->toBase()->reorder();
         $grammar = $query->getGrammar();
 
-        $select = self::select($scope->model, $grammar, $measures);
+        $select = self::select($scope->model, $grammar, $measures, $currency);
         $select[] = new Expression('count(*) as ' . $grammar->wrap(self::ROW_COUNT_ALIAS));
 
         $row = (array) $query->select($select)->first();
+        $values = self::figures($row, $measures);
 
-        return ['values' => self::figures($row, $measures), 'row_count' => (int) self::figure($row[self::ROW_COUNT_ALIAS] ?? 0)];
+        return [
+            'values' => $previous ? $currency->settle([$row], $values) : $currency->settleTotal($row, $values),
+            'row_count' => (int) self::figure($row[self::ROW_COUNT_ALIAS] ?? 0),
+        ];
     }
 
     /**
-     * The select of the measures, each under its positional alias.
+     * The select of the measures, each under its positional alias, and the currency partials of their amounts.
      *
      * @param  list<AggregateMeasure>  $measures
      *
@@ -67,7 +75,7 @@ final class MeasureSql
      *
      * @return list<Expression<string>>
      */
-    public static function select(Model $model, Grammar $grammar, array $measures): array
+    public static function select(Model $model, Grammar $grammar, array $measures, CurrencyCheck $currency): array
     {
         $select = [];
 
@@ -75,7 +83,7 @@ final class MeasureSql
             $select[] = new Expression(self::expression($model, $grammar, $measure, $index) . ' as ' . $grammar->wrap(self::alias($index)));
         }
 
-        return $select;
+        return [...$select, ...$currency->select($model, $grammar)];
     }
 
     /**

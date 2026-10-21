@@ -20,6 +20,9 @@ use UnexpectedValueException;
  * `min` or `max` the value, so an average over a bucket is weighted by the rows of each day, not an average of
  * averages. Every bucket of the period is in the series: one with no row has 0 for `count` and `sum` and null for
  * `avg`, `min` and `max` (contract 5.1). A bucket is keyed by the date of its first day and has no label.
+ *
+ * The partials of a day carry the least and the greatest currency of its rows ({@see CurrencyCheck}), so a bucket
+ * is mixed when its days name more than one currency between them, and its amounts are then `null`.
  */
 final class BucketSeries
 {
@@ -39,14 +42,15 @@ final class BucketSeries
      *
      * @return list<array{key: string, label: null, values: array<string, int|float|string|null>}>
      */
-    public static function read(AggregateScope $scope, AggregateQuery $query, AggregatePeriod $period, TimeBucket $bucket): array
+    public static function read(AggregateScope $scope, AggregateQuery $query, AggregatePeriod $period, TimeBucket $bucket, CurrencyCheck $currency): array
     {
-        $days = self::days($scope, $query->measures, $period->field, $bucket);
+        $days = self::days($scope, $query->measures, $period->field, $bucket, $currency);
         $series = [];
 
         foreach ($period->buckets($bucket) as $start) {
             $key = $bucket->key($start);
-            $series[] = ['key' => $key, 'label' => null, 'values' => self::values($query->measures, $days[$key] ?? [])];
+            $partials = $days[$key] ?? [];
+            $series[] = ['key' => $key, 'label' => null, 'values' => $currency->settle($partials, self::values($query->measures, $partials))];
         }
 
         return self::sorted($series, $query);
@@ -61,7 +65,7 @@ final class BucketSeries
      *
      * @return array<string, list<array<array-key, mixed>>>
      */
-    private static function days(AggregateScope $scope, array $measures, string $field, TimeBucket $bucket): array
+    private static function days(AggregateScope $scope, array $measures, string $field, TimeBucket $bucket, CurrencyCheck $currency): array
     {
         $model = $scope->model;
         $rows = ($scope->baseQuery)()->toBase()->reorder();
@@ -81,6 +85,8 @@ final class BucketSeries
                 $select[] = new Expression('count(' . $column . ') as ' . $grammar->wrap($alias . self::COUNT_SUFFIX));
             }
         }
+
+        array_push($select, ...$currency->select($model, $grammar));
 
         $timezone = config()->string('app.timezone');
         $days = [];
