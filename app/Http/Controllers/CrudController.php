@@ -98,15 +98,18 @@ class CrudController extends Controller
      * the exception, which holds the SQL, and an aggregate answers a failure it did not foresee with a message of
      * its own. Never cached, because the figures follow the rows.
      *
-     * Answers: 200 `{data, meta}`; 422 `{error: {code, message, field?}}` for a request the contract refuses, logged
-     * as a notice when it comes from an invalid argument; the status of a refused permission; 500 `{error: {message}}`,
-     * reported, for anything else.
+     * Answers: 200 `{data, meta}`; 422 `{error: {code, message, field?}}` for a request the contract refuses, reported
+     * when the refusal is a fault of the deployment and logged as a notice when it comes from an invalid argument;
+     * the status of a refused permission; 500 `{error: {message}}`, reported, for anything else.
      */
     final public function aggregate(AggregateRequest $request): Response
     {
         try {
             return new JsonResponse($this->crudService->aggregate($request->parsed(), $request->aggregateQuery())->toArray());
         } catch (AggregateException $exception) {
+            // The refusal decides for itself: a client's mistake stays out of the log, a fault of the deployment goes in.
+            report($exception);
+
             return $exception->toResponse($request);
         } catch (AuthorizationException $exception) {
             return $this->buildResponse(

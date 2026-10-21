@@ -17,6 +17,7 @@ use Modules\Core\Models\Role;
 use Modules\Core\Models\Setting;
 use Modules\Core\Models\User;
 use Modules\Core\Services\Crud\CrudService;
+use Modules\Core\Support\DayTruncation;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -211,7 +212,8 @@ it('answers an unknown field with INVALID_FIELD', function (): void {
         ->and($response->json('error.field'))->toBe('group_by.field');
 });
 
-it('answers an unreadable field with UNREADABLE_FIELD', function (): void {
+it('answers an unreadable field with UNREADABLE_FIELD and does not report it', function (): void {
+    Log::spy();
     aggregateRouteFailingService(new AggregateException(AggregateErrorCode::UnreadableField, '"group_name" cannot be read by this caller.', 'group_by.field'));
 
     $response = $this->actingAs(aggregateRouteViewer())->postJson(route('core.crud.aggregate', aggregateRouteParams()), [
@@ -226,6 +228,32 @@ it('answers an unreadable field with UNREADABLE_FIELD', function (): void {
         'message' => '"group_name" cannot be read by this caller.',
         'field' => 'group_by.field',
     ]);
+
+    Log::shouldNotHaveReceived('error');
+});
+
+it('answers a fault of the deployment the engine raises with its 422 and reports it', function (): void {
+    Log::spy();
+    $fault = DayTruncation::unsupported('firebird');
+    aggregateRouteFailingService($fault);
+
+    $response = $this->actingAs(aggregateRouteViewer())->postJson(route('core.crud.aggregate', aggregateRouteParams()), [
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'created_at', 'bucket' => 'month'],
+        'period' => ['field' => 'created_at', 'preset' => 'this_year'],
+    ]);
+
+    $response->assertUnprocessable();
+
+    expect($response->json('error'))->toBe([
+        'code' => 'UNSUPPORTED_FUNCTION',
+        'message' => 'Time buckets are not supported on the "firebird" database driver.',
+        'field' => 'group_by.bucket',
+    ]);
+
+    Log::shouldHaveReceived('error')->once()->withArgs(
+        static fn (string $message, array $context): bool => $message === $fault->getMessage() && ($context['exception'] ?? null) === $fault,
+    );
 });
 
 it('answers a malformed scope filter with INVALID_FIELD on filters', function (): void {
