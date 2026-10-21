@@ -178,6 +178,91 @@ it('one currency beside rows with no currency is not mixed', function (): void {
         ->and($result->meta)->not->toHaveKeys(['currencies', 'warnings']);
 });
 
+it('a blank currency is no currency and cannot hide a mixed cell', function (): void {
+    AggregateTestKit::seedOrders([
+        ['total' => '10', 'currency' => ''],
+        ['total' => '20', 'currency' => 'EUR'],
+        ['total' => '30', 'currency' => 'USD'],
+    ]);
+
+    $result = aggregate_currency_run(['measures' => [['fn' => 'sum', 'field' => 'total']]]);
+
+    expect($result->total)->toBe(['sum_total' => null])
+        ->and(array_column($result->meta['warnings'], 'field'))->toBe(['sum_total'])
+        ->and($result->meta['currencies'])->toBe(['EUR', 'USD'])
+        ->and($result->meta)->not->toHaveKey('currency');
+});
+
+it('one currency beside blank currencies is not mixed', function (): void {
+    AggregateTestKit::seedOrders([
+        ['total' => '10', 'currency' => ''],
+        ['total' => '20', 'currency' => 'EUR'],
+    ]);
+
+    $result = aggregate_currency_run(['measures' => [['fn' => 'sum', 'field' => 'total']]]);
+
+    expect($result->total)->toBe(['sum_total' => 30])
+        ->and($result->meta['currency'])->toBe('EUR')
+        ->and($result->meta)->not->toHaveKeys(['currencies', 'warnings']);
+});
+
+it('rows with only blank or null currencies have no currency', function (): void {
+    AggregateTestKit::seedOrders([
+        ['total' => '10', 'currency' => ''],
+        ['total' => '20'],
+        ['total' => '5', 'currency' => ''],
+    ]);
+
+    $result = aggregate_currency_run(['measures' => [['fn' => 'sum', 'field' => 'total']]]);
+
+    expect($result->total)->toBe(['sum_total' => 35])
+        ->and($result->meta)->not->toHaveKeys(['currency', 'currencies', 'warnings']);
+});
+
+it('a blank currency is no currency in a group', function (): void {
+    AggregateTestKit::seedOrders([
+        ['status' => 'new', 'total' => '10', 'currency' => ''],
+        ['status' => 'new', 'total' => '20', 'currency' => 'EUR'],
+        ['status' => 'paid', 'total' => '1', 'currency' => ''],
+        ['status' => 'paid', 'total' => '2', 'currency' => 'EUR'],
+        ['status' => 'paid', 'total' => '3', 'currency' => 'USD'],
+    ]);
+
+    $result = aggregate_currency_run([
+        'measures' => [['fn' => 'sum', 'field' => 'total']],
+        'group_by' => ['field' => 'status'],
+        'sort' => ['by' => 'key', 'dir' => 'asc'],
+    ]);
+
+    expect($result->series)->toBe([
+        ['key' => 'new', 'label' => null, 'values' => ['sum_total' => 30]],
+        ['key' => 'paid', 'label' => null, 'values' => ['sum_total' => null]],
+    ])
+        ->and($result->meta['currencies'])->toBe(['EUR', 'USD']);
+});
+
+it('a blank currency is no currency in a bucket', function (): void {
+    AggregateTestKit::seedOrders([
+        ['ordered_at' => '2026-01-05 10:00:00', 'total' => '10', 'currency' => ''],
+        ['ordered_at' => '2026-01-20 10:00:00', 'total' => '20', 'currency' => 'EUR'],
+        ['ordered_at' => '2026-02-03 10:00:00', 'total' => '1', 'currency' => ''],
+        ['ordered_at' => '2026-02-10 10:00:00', 'total' => '2', 'currency' => 'EUR'],
+        ['ordered_at' => '2026-02-20 10:00:00', 'total' => '3', 'currency' => 'USD'],
+    ]);
+
+    $result = aggregate_currency_run([
+        'measures' => [['fn' => 'sum', 'field' => 'total']],
+        'group_by' => ['field' => 'ordered_at', 'bucket' => 'month'],
+        'period' => ['field' => 'ordered_at', 'from' => '2026-01-01', 'to' => '2026-02-28'],
+    ]);
+
+    expect($result->series)->toBe([
+        ['key' => '2026-01-01', 'label' => null, 'values' => ['sum_total' => 30]],
+        ['key' => '2026-02-01', 'label' => null, 'values' => ['sum_total' => null]],
+    ])
+        ->and($result->meta['currencies'])->toBe(['EUR', 'USD']);
+});
+
 it('a group of one currency keeps its value while a mixed group is null', function (): void {
     AggregateTestKit::seedOrders([
         ['status' => 'new', 'total' => '10', 'currency' => 'EUR'],
@@ -427,6 +512,36 @@ it('the currencies met are at most twenty', function (): void {
     expect($result->meta['currencies'])->toHaveCount(20)
         ->and($result->meta['currencies'][0])->toBe('C01')
         ->and($result->meta['currencies'][19])->toBe('C20');
+});
+
+it('the currencies met are those of the rows the caller may see', function (): void {
+    AggregateTestKit::seedOrders([
+        ['status' => 'new', 'total' => '10', 'currency' => 'EUR'],
+        ['status' => 'new', 'total' => '20', 'currency' => 'USD'],
+        ['status' => 'paid', 'total' => '5', 'currency' => 'GBP'],
+    ]);
+    AggregateTestKit::asReader([AggregateOrderStubModel::class => new FiltersGroup([new Filter('status', 'new')])]);
+
+    $result = aggregate_currency_run(['measures' => [['fn' => 'sum', 'field' => 'total']]]);
+
+    expect($result->total)->toBe(['sum_total' => null])
+        ->and($result->meta['currencies'])->toBe(['EUR', 'USD']);
+});
+
+it('the currencies met are those of the rows of the period', function (): void {
+    AggregateTestKit::seedOrders([
+        ['ordered_at' => '2026-01-10 10:00:00', 'total' => '10', 'currency' => 'EUR'],
+        ['ordered_at' => '2026-01-20 10:00:00', 'total' => '20', 'currency' => 'USD'],
+        ['ordered_at' => '2026-02-10 10:00:00', 'total' => '5', 'currency' => 'GBP'],
+    ]);
+
+    $result = aggregate_currency_run([
+        'measures' => [['fn' => 'sum', 'field' => 'total']],
+        'period' => ['field' => 'ordered_at', 'from' => '2026-01-01', 'to' => '2026-01-31'],
+    ]);
+
+    expect($result->total)->toBe(['sum_total' => null])
+        ->and($result->meta['currencies'])->toBe(['EUR', 'USD']);
 });
 
 it('the rows the caller may not see do not mix their currency into the figures', function (): void {

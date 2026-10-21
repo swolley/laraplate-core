@@ -27,12 +27,13 @@ use Modules\Core\Support\CurrencyColumns;
  * name more than one currency: the value of that measure is then `null`, and the measure gets one warning, however
  * many cells mix.
  *
- * A row with no currency has none: SQL leaves a null out of `min` and `max`, so a cell with one currency beside
- * rows with no currency keeps its value and has that currency, and a cell with no currency at all has none.
+ * A row with no currency has none, and an empty string is no currency either: the partials read the column through
+ * `nullif(<currency>, '')`, so `min` and `max` leave a blank out exactly as they leave a null out (a blank would
+ * otherwise sort first and hide the least real currency). A cell with one currency beside rows with no currency
+ * keeps its value and has that currency, and a cell with no currency at all has none.
  *
- * Grouping by the currency column of an amount makes every group single-currency, so the figure of a group is
- * never checked there and a total or a `other` that adds the groups up is left empty without a warning. A `count`
- * is never checked.
+ * Grouping by the currency column of an amount makes every group single-currency, so no group can mix there; the
+ * total and the `other` that add the groups up do, and are left empty without a warning. A `count` is never checked.
  *
  * One instance serves one run and keeps what its cells showed: the engine reads {@see self::meta()} once, after
  * every cell was settled.
@@ -120,10 +121,10 @@ final class CurrencyCheck
         $select = [];
 
         foreach ($this->amounts as $index => $amount) {
-            $column = $grammar->wrap($model->qualifyColumn($amount['column']));
+            $currency = self::present($grammar->wrap($model->qualifyColumn($amount['column'])));
 
-            $select[] = new Expression('min(' . $column . ') as ' . $grammar->wrap(self::alias($index, 'min')));
-            $select[] = new Expression('max(' . $column . ') as ' . $grammar->wrap(self::alias($index, 'max')));
+            $select[] = new Expression('min(' . $currency . ') as ' . $grammar->wrap(self::alias($index, 'min')));
+            $select[] = new Expression('max(' . $currency . ') as ' . $grammar->wrap(self::alias($index, 'max')));
         }
 
         return $select;
@@ -203,17 +204,22 @@ final class CurrencyCheck
     }
 
     /**
-     * A currency as the database gave it, or null when the row has none.
+     * The wrapped column read as null when it holds an empty string. `nullif` is standard SQL and does not change
+     * Oracle, which stores an empty string as null already (a `case when <currency> <> '' ...` would hide every
+     * currency there).
+     */
+    private static function present(string $wrapped): string
+    {
+        return 'nullif(' . $wrapped . ", '')";
+    }
+
+    /**
+     * A currency as the database gave it, or null when the row has none. The queries leave blanks out, so a value
+     * is used as it comes.
      */
     private static function currency(mixed $value): ?string
     {
-        if (! is_string($value) && ! is_int($value)) {
-            return null;
-        }
-
-        $currency = mb_trim((string) $value);
-
-        return $currency === '' ? null : $currency;
+        return is_string($value) || is_int($value) ? (string) $value : null;
     }
 
     /**
@@ -293,10 +299,10 @@ final class CurrencyCheck
         foreach ($columns as $column) {
             $rows = ($scope->baseQuery)()->toBase()->reorder();
             $grammar = $rows->getGrammar();
-            $qualified = $model->qualifyColumn($column);
+            $currency = self::present($grammar->wrap($model->qualifyColumn($column)));
 
-            $rows->select(new Expression($grammar->wrap($qualified) . ' as ' . $grammar->wrap(self::MET_ALIAS)))
-                ->whereNotNull($qualified)
+            $rows->select(new Expression($currency . ' as ' . $grammar->wrap(self::MET_ALIAS)))
+                ->whereRaw($currency . ' is not null')
                 ->distinct();
 
             $query = $query instanceof BaseQueryBuilder ? $query->union($rows) : $rows;
