@@ -14,17 +14,11 @@
                         @php
                             $app_info = $grouped_modules['App'] ?? [];
                         @endphp
-                        <div class="flex items-start justify-between gap-4 w-full">
-                            <div class="flex flex-col gap-1 min-w-0">
-                                <div class="flex items-baseline gap-3">
-                                    <h2 class="text-xl font-semibold text-black dark:text-white">{{ config('app.name') }}</h2>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ $app_info['version'] ?? 'N/A' }}</span>
-                                </div>
-                                @if (! empty($app_info['description']))
-                                    <p class="text-sm text-gray-600 dark:text-gray-300">{{ $app_info['description'] }}</p>
-                                @endif
-                            </div>
-                            <img class="w-12 h-12 shrink-0 ml-4 mr-2" src="{{ config('app.logo') }}" alt="" />
+                        <div class="flex flex-col gap-1 w-full">
+                            <h2 class="text-xl font-semibold text-black dark:text-white">{{ config('app.name') }}</h2>
+                            @if (! empty($app_info['description']))
+                                <p class="text-sm text-gray-600 dark:text-gray-300">{{ $app_info['description'] }}</p>
+                            @endif
                         </div>
 
                         <div class="relative flex flex-col items-center gap-6 lg:items-end w-full">

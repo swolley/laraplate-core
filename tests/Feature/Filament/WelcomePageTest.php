@@ -20,7 +20,7 @@ function welcomePageActor(): void
     Filament::setCurrentPanel('admin');
 }
 
-it('shows the application version and description, and no big logo', function (): void {
+it('shows the application description and no big logo', function (): void {
     welcomePageActor();
 
     $composer = json_decode((string) file_get_contents(base_path('composer.json')), true);
@@ -28,7 +28,6 @@ it('shows the application version and description, and no big logo', function ()
     Livewire::test(Welcome::class)
         ->assertOk()
         ->assertSee((string) $composer['description'])
-        ->assertSee(version())
         ->assertDontSeeHtml('w-90 h-90');
 });
 
