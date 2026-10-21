@@ -176,6 +176,7 @@ CACHE_DURATION_LONG=3600						#long cache duration in seconds
 
 #app
 APP_LOGO=										#application logo
+APP_FAVICON=										#browser tab icon of the admin panel
 
 #social login
 FACEBOOK_CLIENT_ID=								#facebook client id
