@@ -495,6 +495,60 @@ it('compare adds a series aligned by position for a bucketed request', function 
         ]);
 });
 
+it('compare.series stays chronological whatever the sort of the series', function (array $sort, array $keys): void {
+    AggregateTestKit::seedOrders([
+        ['ordered_at' => '2026-01-15 10:00:00'],
+        ['ordered_at' => '2026-03-03 10:00:00'],
+        ['ordered_at' => '2026-03-03 15:00:00'],
+        ['ordered_at' => '2026-04-10 10:00:00'],
+        ['ordered_at' => '2026-06-20 10:00:00'],
+        ['ordered_at' => '2026-06-21 10:00:00'],
+    ]);
+
+    $result = aggregate_buckets([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'ordered_at', 'bucket' => 'month'],
+        'period' => ['field' => 'ordered_at', 'from' => '2026-04-01', 'to' => '2026-06-30'],
+        'sort' => $sort,
+        'compare' => 'previous_period',
+    ]);
+
+    expect(array_column($result->series, 'key'))->toBe($keys)
+        ->and($result->compare['series'] ?? null)->toBe([
+            ['key' => '2026-01-01', 'label' => null, 'values' => ['count' => 1]],
+            ['key' => '2026-02-01', 'label' => null, 'values' => ['count' => 0]],
+            ['key' => '2026-03-01', 'label' => null, 'values' => ['count' => 2]],
+        ]);
+})->with([
+    'by measure, descending' => [['by' => 'measure', 'dir' => 'desc'], ['2026-06-01', '2026-04-01', '2026-05-01']],
+    'by key, descending' => [['by' => 'key', 'dir' => 'desc'], ['2026-06-01', '2026-05-01', '2026-04-01']],
+]);
+
+it('compare.series stays chronological when the previous period has fewer buckets', function (): void {
+    AggregateTestKit::seedOrders([
+        ['ordered_at' => '2026-01-08 10:00:00'],
+        ['ordered_at' => '2026-01-13 10:00:00'],
+        ['ordered_at' => '2026-01-14 10:00:00'],
+        ['ordered_at' => '2026-01-17 10:00:00'],
+        ['ordered_at' => '2026-01-20 10:00:00'],
+        ['ordered_at' => '2026-01-26 10:00:00'],
+    ]);
+
+    $result = aggregate_buckets([
+        'measures' => [['fn' => 'count']],
+        'group_by' => ['field' => 'ordered_at', 'bucket' => 'week'],
+        'period' => ['field' => 'ordered_at', 'from' => '2026-01-17', 'to' => '2026-01-26'],
+        'sort' => ['by' => 'key', 'dir' => 'desc'],
+        'compare' => 'previous_period',
+    ]);
+
+    expect(array_column($result->series, 'key'))->toBe(['2026-01-26', '2026-01-19', '2026-01-12'])
+        ->and($result->compare['series'] ?? null)->toBe([
+            ['key' => '2026-01-05', 'label' => null, 'values' => ['count' => 1]],
+            ['key' => '2026-01-12', 'label' => null, 'values' => ['count' => 2]],
+        ]);
+});
+
 it('compare without a bucket gives only a total', function (): void {
     AggregateTestKit::seedOrders([
         ['ordered_at' => '2026-01-10 10:00:00', 'status' => 'paid'],

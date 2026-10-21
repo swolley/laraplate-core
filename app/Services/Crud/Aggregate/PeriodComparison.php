@@ -11,9 +11,12 @@ use Modules\Core\Exceptions\AggregateException;
  * The `compare` of an aggregate result (spec 4.3): the same figures over the previous period of equal length.
  *
  * Every request with a comparison gets the total of the previous period; a bucketed one gets its series too,
- * built by the same rules as the current one (every bucket filled, the same sort), so `compare.series[i]` stands
- * beside `series[i]`. The two series are as long as their periods have buckets: a period that is not whole months
- * can start or end its previous one in a partial bucket more or less.
+ * built by the same rules as the current one (every bucket filled) but always in the order of the calendar,
+ * whatever the sort of the request (ruling P16): pairing two series by position only means something on the
+ * calendar axis. So `compare.series[i]` stands beside `series[i]` only while `series` is chronological too, which
+ * is the default sort of a bucketed request; a series sorted by a measure, or by key descending, is put back in the
+ * order of its keys before it is paired. The two series are as long as their periods have buckets: a period that
+ * is not whole months can start or end its previous one in a partial bucket more or less.
  */
 final class PeriodComparison
 {
@@ -36,7 +39,7 @@ final class PeriodComparison
         $compare = ['total' => MeasureSql::totals($rows, $query->measures, $currency, previous: true)['values']];
 
         if ($plan->bucket instanceof TimeBucket) {
-            $compare['series'] = BucketSeries::read($rows, $query, $plan->previous, $plan->bucket, $currency);
+            $compare['series'] = BucketSeries::chronological($rows, $query, $plan->previous, $plan->bucket, $currency);
         }
 
         return $compare;

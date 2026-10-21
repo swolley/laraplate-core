@@ -45,6 +45,20 @@ final class BucketSeries
      */
     public static function read(AggregateScope $scope, AggregateQuery $query, AggregatePeriod $period, TimeBucket $bucket, CurrencyCheck $currency): array
     {
+        return self::sorted(self::chronological($scope, $query, $period, $bucket, $currency), $query);
+    }
+
+    /**
+     * The series as {@see self::read()} builds it, in the order of the calendar whatever the sort of the query: the
+     * buckets by ascending key.
+     *
+     * @throws AggregateException
+     * @throws UnexpectedValueException when the database gives a row of the period no `Y-m-d` day
+     *
+     * @return list<array{key: string, label: null, values: array<string, int|float|string|null>}>
+     */
+    public static function chronological(AggregateScope $scope, AggregateQuery $query, AggregatePeriod $period, TimeBucket $bucket, CurrencyCheck $currency): array
+    {
         $days = self::days($scope, $query->measures, $period->field, $bucket, $currency);
         $series = [];
 
@@ -54,7 +68,7 @@ final class BucketSeries
             $series[] = ['key' => $key, 'label' => null, 'values' => $currency->settle($partials, self::values($query->measures, $partials))];
         }
 
-        return self::sorted($series, $query);
+        return $series;
     }
 
     /**
