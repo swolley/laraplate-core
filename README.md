@@ -488,7 +488,7 @@ $outcome = app(SeedReconciler::class)->reconcile(
 Module seeders build this exact definition through
 `Seeder::internalSettingsDefinition($module, $rows)`, which stamps `is_internal` from the declaring
 module's ownership: `true` when `is_laraplate_owned_module($module)` holds (`module.json`
-`laraplate_owned`, or a `getlaraplate/laraplate-*` composer name), `false` for a third-party module
+`laraplate_owned`, or a `getlaraplate/lara*` composer name), `false` for a third-party module
 shipping its own settings. Because the flag is structural, a re-seed also follows a module that
 changes ownership.
 `group_name` is deliberately not structural: it is written when the row is created and then

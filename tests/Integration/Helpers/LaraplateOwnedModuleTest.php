@@ -28,7 +28,7 @@ it('honours explicit laraplate_owned false over composer package name', function
     ], JSON_THROW_ON_ERROR));
 
     file_put_contents($path . DIRECTORY_SEPARATOR . 'composer.json', json_encode([
-        'name' => 'getlaraplate/laraplate-fake',
+        'name' => 'getlaraplate/larafake',
     ], JSON_THROW_ON_ERROR));
 
     try {
@@ -40,7 +40,7 @@ it('honours explicit laraplate_owned false over composer package name', function
     }
 });
 
-it('falls back to getlaraplate/laraplate-* composer name when flag is absent', function (): void {
+it('falls back to getlaraplate/lara* composer name when flag is absent', function (): void {
     $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'laraplate-owned-' . uniqid('', true);
     mkdir($path);
 
@@ -49,7 +49,7 @@ it('falls back to getlaraplate/laraplate-* composer name when flag is absent', f
     ], JSON_THROW_ON_ERROR));
 
     file_put_contents($path . DIRECTORY_SEPARATOR . 'composer.json', json_encode([
-        'name' => 'getlaraplate/laraplate-fake',
+        'name' => 'getlaraplate/larafake',
     ], JSON_THROW_ON_ERROR));
 
     try {
@@ -60,6 +60,31 @@ it('falls back to getlaraplate/laraplate-* composer name when flag is absent', f
         rmdir($path);
     }
 });
+
+it('does not treat a package outside the getlaraplate lara* names as owned', function (string $package): void {
+    $path = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'laraplate-owned-' . uniqid('', true);
+    mkdir($path);
+
+    file_put_contents($path . DIRECTORY_SEPARATOR . 'module.json', json_encode([
+        'name' => 'Fake',
+    ], JSON_THROW_ON_ERROR));
+
+    file_put_contents($path . DIRECTORY_SEPARATOR . 'composer.json', json_encode([
+        'name' => $package,
+    ], JSON_THROW_ON_ERROR));
+
+    try {
+        expect(laraplate_module_is_owned_at_path($path))->toBeFalse();
+    } finally {
+        unlink($path . DIRECTORY_SEPARATOR . 'module.json');
+        unlink($path . DIRECTORY_SEPARATOR . 'composer.json');
+        rmdir($path);
+    }
+})->with([
+    'another vendor with a lara name' => 'acme/larafake',
+    'a getlaraplate package that is not a lara module' => 'getlaraplate/fake',
+    'the previous swolley vendor' => 'swolley/laraplate-fake',
+]);
 
 it('exposes ownership via Module macro', function (): void {
     $module = Module::find('Core');

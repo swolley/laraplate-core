@@ -52,7 +52,7 @@ class Seeder extends BaseSeeder
      *
      * `is_internal` follows the declaring module's ownership, not the fact that a
      * seeder wrote the row: {@see is_laraplate_owned_module()} reads `module.json`
-     * `laraplate_owned`, falling back to a `getlaraplate/laraplate-*` composer name. A
+     * `laraplate_owned`, falling back to a `getlaraplate/lara*` composer name. A
      * third-party module shipping its own settings through this definition gets
      * `is_internal = false`. The flag is structural, so a re-seed realigns rows
      * written before it existed and follows a module that changes ownership.
