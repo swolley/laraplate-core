@@ -110,6 +110,7 @@ use Modules\Core\Search\SearchableContributorRegistry;
 use Modules\Core\Search\Support\PgvectorProfileIndex;
 use Modules\Core\Services\Authorization\AuthorizationService;
 use Modules\Core\Services\CronParameters;
+use Modules\Core\Services\Crud\Aggregate\AggregateLimits;
 use Modules\Core\Services\Crud\DomainActionRegistry;
 use Modules\Core\Services\DatabaseConfigOverlay;
 use Modules\Core\Services\DynamicContentsService;
@@ -281,6 +282,10 @@ final class CoreServiceProvider extends ModuleServiceProvider
         );
         $this->app->bind(OutboxPublisher::class, StubOutboxPublisher::class);
         $this->app->bind(BootSampler::class, SubprocessBootSampler::class);
+
+        // Read from `core.aggregate.*` each time an aggregate engine is built: the constructor holds the values only.
+        $this->app->bind(AggregateLimits::class, static fn (): AggregateLimits => AggregateLimits::fromConfig());
+
         $this->app->scoped(ActiveVersionSet::class);
         $this->app->scoped(VersionSetManagerInterface::class, VersionSetManager::class);
         $this->app->scoped(VersionWriterInterface::class, VersionWriter::class);

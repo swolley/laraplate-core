@@ -6,6 +6,7 @@ namespace Modules\Core\Services\Crud;
 
 use BadMethodCallException;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use DomainException;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -52,6 +53,9 @@ use Modules\Core\Contracts\ProvidesDefaultSearchFilters;
 use Modules\Core\Contracts\ProvidesFacetLabelSources;
 use Modules\Core\Contracts\ProvidesSyncableRelations;
 use Modules\Core\Contracts\RestrictsCrudWrites;
+use Modules\Core\Enums\AggregateErrorCode;
+use Modules\Core\Enums\ColumnKind;
+use Modules\Core\Exceptions\AggregateException;
 use Modules\Core\Exceptions\CrudWriteNotAllowedException;
 use Modules\Core\Helpers\LocaleContext;
 use Modules\Core\Locking\Exceptions\LockedModelException;
@@ -72,6 +76,12 @@ use Modules\Core\Search\Services\ScoutSearchConstraintApplier;
 use Modules\Core\Search\Services\SearchCostGuard;
 use Modules\Core\Search\Traits\Searchable;
 use Modules\Core\Services\Authorization\AuthorizationService;
+use Modules\Core\Services\Crud\Aggregate\AggregateEngine;
+use Modules\Core\Services\Crud\Aggregate\AggregateGroup;
+use Modules\Core\Services\Crud\Aggregate\AggregateMeasure;
+use Modules\Core\Services\Crud\Aggregate\AggregateQuery;
+use Modules\Core\Services\Crud\Aggregate\AggregateResult;
+use Modules\Core\Services\Crud\Aggregate\AggregateScope;
 use Modules\Core\Services\Crud\Concerns\HasCrudOperations;
 use Modules\Core\Services\Crud\DTOs\CrudMeta;
 use Modules\Core\Services\Crud\DTOs\CrudResult;
@@ -82,6 +92,7 @@ use Modules\Core\Services\Crud\DTOs\FacetSort;
 use Modules\Core\Services\Crud\DTOs\PaginationMode;
 use Modules\Core\Services\ModificationVoteService;
 use Modules\Core\SoftDeletes\SoftDeletes as CoreSoftDeletes;
+use Modules\Core\Support\ColumnKinds;
 use Modules\Core\Support\ComputedColumnGuard;
 use Modules\Core\Support\PermissionName;
 use Modules\Core\Support\ReadableColumnGuard;
@@ -127,6 +138,7 @@ class CrudService
         private readonly ?AdvancedSearchService $advanced_search = null,
         private readonly ?ScoutSearchConstraintApplier $search_constraint_applier = null,
         private readonly ?RelationAuthorizer $relation_authorizer = null,
+        private readonly ?AggregateEngine $aggregate_engine = null,
     ) {}
 
     public function list(ListRequestData $requestData): CrudResult
@@ -437,6 +449,49 @@ class CrudService
         ], $page_keys);
 
         return new FacetPage(array_values($values), $distinct_values, $facet->page, $facet->perPage);
+    }
+
+    /**
+     * The figures of an aggregate request under the permissions of the list (spec 4.2): the caller needs `select` on
+     * the entity, names only relations and columns it may read, and every figure covers only the rows the
+     * row-level ACL and the list filters leave.
+     *
+     * The engine reads the rows and the related entities through an {@see AggregateScope} of closures over the
+     * helpers of the facets (ruling R5).
+     *
+     * @throws AuthorizationException when the caller may not select the entity, or a relation the filters name
+     * @throws AggregateException when a field is not a column the aggregate can read, the caller cannot read it, or it does not suit its function
+     */
+    public function aggregate(ListRequestData $base, AggregateQuery $query): AggregateResult
+    {
+        $model = $base->model;
+        $request = $base->request;
+        $filters = $base->filters;
+
+        $permission_name = $this->auth->ensurePermission(
+            $request,
+            $model->getTable(),
+            'select',
+            $model->getConnectionName(),
+        );
+
+        // The fields of an aggregate are not list columns: they are checked below, against the aggregate rules.
+        $this->authorizeRequestedRelations($base, include_columns: false);
+        $this->assertAggregateFields($model, $query);
+
+        $scope = new AggregateScope(
+            model: $model,
+            baseQuery: fn (): Builder => $this->listedRowsQuery($request, $model, $permission_name, $filters),
+            filteredIds: fn (): BaseQueryBuilder => $this->relationParentIds($request, $model, $permission_name, $filters, null),
+            visibleRelatedKeys: fn (Model $related, string $owner_key): ?BaseQueryBuilder => $this->visibleRelatedKeys($request, $model, $related, $owner_key),
+            resolveToOne: fn (string $path): ?array => $this->resolveToOneColumn($model, $path),
+            resolveLabels: fn (string $key, array $page_keys, string $label_field): array => array_map(
+                static fn (array $attributes): mixed => $attributes[$label_field] ?? null,
+                $this->resolveFacetLabels($model, $key, $page_keys, [$label_field], $request),
+            ),
+        );
+
+        return $this->aggregateEngine()->run($scope, $query, CarbonImmutable::now());
     }
 
     /**
@@ -1447,6 +1502,11 @@ class CrudService
         return $this->relation_authorizer ?? resolve(RelationAuthorizer::class);
     }
 
+    private function aggregateEngine(): AggregateEngine
+    {
+        return $this->aggregate_engine ?? resolve(AggregateEngine::class);
+    }
+
     /**
      * The keys (`$key_column` values) of the related rows the caller may see, for a facet query that reads a
      * related table directly; null when nothing narrows them.
@@ -1733,21 +1793,165 @@ class CrudService
      */
     private function relationParentIds(Request $request, Model $model, string $permission_name, ?FiltersGroup $filters, ?string $relation): BaseQueryBuilder
     {
+        if ($filters instanceof FiltersGroup && $relation !== null) {
+            $filters = $this->excludeFacetField($filters, $relation);
+        }
+
+        return $this->listedRowsQuery($request, $model, $permission_name, $filters)
+            ->toBase()
+            ->select($model->getTable() . '.' . $model->getKeyName());
+    }
+
+    /**
+     * The rows of the model a list with these filters shows the caller: the row-level ACL, then the filters.
+     *
+     * @return Builder<Model>
+     */
+    private function listedRowsQuery(Request $request, Model $model, string $permission_name, ?FiltersGroup $filters): Builder
+    {
         $query = $model->newQuery();
         $this->auth->applyAclFiltersToQuery($query, $permission_name);
 
         if ($filters instanceof FiltersGroup) {
             $relation_columns = [];
-            $this->query_builder->applyFilters(
-                $query,
-                $relation !== null ? $this->excludeFacetField($filters, $relation) : $filters,
-                $relation_columns,
-                $this->relationAuthorizer(),
-                $request,
-            );
+            $this->query_builder->applyFilters($query, $filters, $relation_columns, $this->relationAuthorizer(), $request);
         }
 
-        return $query->toBase()->select($model->getTable() . '.' . $model->getKeyName());
+        return $query;
+    }
+
+    /**
+     * Refuses, before anything is queried, a field of an aggregate request the engine may not read (spec 4.2, 4.5):
+     * a measure field is a column of the entity itself; a group field is a column of the entity or of a single-hop
+     * to-one relation (`customer.country`); a group label is a column of the to-one relation whose foreign key is the
+     * group field; a period field is a column of the entity. The caller must be able to read each of them, and a
+     * measure must suit its column. The sort names no field: it follows the first measure or the group.
+     *
+     * @throws AggregateException
+     */
+    private function assertAggregateFields(Model $model, AggregateQuery $query): void
+    {
+        foreach ($query->measures as $index => $measure) {
+            if ($measure->field !== null) {
+                $this->assertAggregateColumn($model, $model, $measure->field, $measure->field, 'measures.' . $index . '.field');
+            }
+        }
+
+        $group = $query->group;
+
+        if ($group instanceof AggregateGroup) {
+            if (str_contains($group->field, '.')) {
+                $to_one = $this->resolveToOneColumn($model, $group->field);
+                $this->assertAggregateColumn($model, $to_one['related'] ?? null, $to_one['column'] ?? '', $group->field, 'group_by.field');
+            } else {
+                $this->assertAggregateColumn($model, $model, $group->field, $group->field, 'group_by.field');
+            }
+
+            if ($group->label !== null) {
+                $this->assertAggregateLabel($model, $group->field, $group->label);
+            }
+        }
+
+        if ($query->period !== null) {
+            $period_field = $query->period['field'] ?? null;
+            $period_field = is_string($period_field) ? $period_field : '';
+            $this->assertAggregateColumn($model, $model, $period_field, $period_field, 'period.field');
+        }
+
+        foreach ($query->measures as $index => $measure) {
+            $this->assertMeasurable($model, $measure, 'measures.' . $index . '.field');
+        }
+    }
+
+    /**
+     * @param  Model|null  $owner  The model whose table holds the column; null when the path reaches no table.
+     * @param  string  $path  The field as the request names it, read by the caller from the entity.
+     * @param  string  $field  The place of the field in the request, for the error.
+     *
+     * @throws AggregateException INVALID_FIELD when the column is not on the table, UNREADABLE_FIELD when the caller may not read the path
+     */
+    private function assertAggregateColumn(Model $model, ?Model $owner, string $column, string $path, string $field): void
+    {
+        if (! $owner instanceof Model || ! ColumnKinds::exists($owner, $column)) {
+            throw $this->unknownAggregateField($path, $field);
+        }
+
+        $this->assertReadableAggregatePath($model, $path, $field);
+    }
+
+    /**
+     * A group label is a column of the to-one relation whose foreign key is the group field (spec 4.7): a
+     * `BelongsTo`, or a label source the model declares. A source of a translated label reads the column it
+     * declares, so that column is the only one a request may name through it.
+     *
+     * @throws AggregateException
+     */
+    private function assertAggregateLabel(Model $model, string $group_field, string $label): void
+    {
+        $target = $this->resolveLabelRelation($model, $group_field, $label);
+
+        if ($target === null) {
+            throw $this->unknownAggregateField($label, 'group_by.label');
+        }
+
+        $source = $model instanceof ProvidesFacetLabelSources ? ($model->facetLabelSources()[Str::before($label, '.')] ?? null) : null;
+        $translated = $source instanceof FacetLabelSource
+            && $source->translationRelation !== null
+            && $group_field === $this->facetKey($source->foreignKey);
+
+        $exists = $translated
+            ? $target['column'] === $source->translationColumn
+            : ColumnKinds::exists($target['related'], $target['column']);
+
+        if (! $exists) {
+            throw $this->unknownAggregateField($label, 'group_by.label');
+        }
+
+        $this->assertReadableAggregatePath($model, $label, 'group_by.label');
+    }
+
+    /**
+     * @throws AggregateException UNREADABLE_FIELD when the caller may not read the path
+     */
+    private function assertReadableAggregatePath(Model $model, string $path, string $field): void
+    {
+        try {
+            ReadableColumnGuard::assertReadablePath($model, $path);
+        } catch (InvalidArgumentException) {
+            throw new AggregateException(AggregateErrorCode::UnreadableField, sprintf('"%s" cannot be read by this caller.', $path), $field);
+        }
+    }
+
+    private function unknownAggregateField(string $path, string $field): AggregateException
+    {
+        return new AggregateException(AggregateErrorCode::InvalidField, sprintf('"%s" is not a column this aggregate can read.', $path), $field);
+    }
+
+    /**
+     * A measure suits its column (spec 4.5): `count` any column, `min` and `max` a numeric or temporal one, `sum` and
+     * `avg` a numeric one that is not a key.
+     *
+     * @throws AggregateException NOT_MEASURABLE
+     */
+    private function assertMeasurable(Model $model, AggregateMeasure $measure, string $field): void
+    {
+        if ($measure->field === null) {
+            return;
+        }
+
+        $kind = ColumnKinds::of($model, $measure->field);
+
+        $refusal = match ($measure->fn) {
+            'min', 'max' => $kind === ColumnKind::Other ? 'min and max need a column of numbers or dates' : null,
+            'sum', 'avg' => $kind !== ColumnKind::Numeric || ColumnKinds::isKey($model, $measure->field) ? 'sum and avg need a column of numbers that is not a key' : null,
+            default => null,
+        };
+
+        throw_if($refusal !== null, new AggregateException(
+            AggregateErrorCode::NotMeasurable,
+            sprintf('"%s" cannot be measured with %s: %s.', $measure->field, $measure->fn, $refusal),
+            $field,
+        ));
     }
 
     /**
