@@ -9,6 +9,8 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Request;
@@ -150,9 +152,10 @@ final class QueryBuilder
         $relations_sorts = [];
         $relations_aggregates = [];
         $relations_filters = [];
-        $computed_relations = $this->extractComputedColumns($main_entity, $request_data->columns)['relations'];
+        $request_columns = $this->requestColumns($query->getModel(), $request_data->columns);
+        $computed_relations = $this->extractComputedColumns($main_entity, $request_columns)['relations'];
 
-        foreach ($this->groupColumns($main_entity, $request_data->columns)['relations'] as $relation => $relation_cols) {
+        foreach ($this->groupColumns($main_entity, $request_columns)['relations'] as $relation => $relation_cols) {
             $relations_columns[$relation] = array_values(array_filter($relation_cols, static fn (Column $column): bool => $column->type === ColumnType::Column));
 
             if (! in_array($relation, $relations, true)) {
@@ -194,12 +197,13 @@ final class QueryBuilder
     public function requestedRelationPaths(Model $model, SelectRequestData $request_data, bool $lenient_filters = false, bool $include_columns = true): array
     {
         $main_entity = $model->getTable();
-        $columns = $this->groupColumns($main_entity, $include_columns ? $request_data->columns : []);
+        $request_columns = $include_columns ? $this->requestColumns($model, $request_data->columns) : [];
+        $columns = $this->groupColumns($main_entity, $request_columns);
         $loaded = array_merge(
             $this->normalizeRelations($request_data->relations),
             array_keys($columns['relations']),
             array_keys($columns['aggregates']),
-            array_keys($this->extractComputedColumns($main_entity, $include_columns ? $request_data->columns : [])['relations']),
+            array_keys($this->extractComputedColumns($main_entity, $request_columns)['relations']),
             $this->groupByRelations($request_data),
         );
         $this->cleanRelations($loaded);
@@ -290,7 +294,8 @@ final class QueryBuilder
         $relations_filters = [];
         $normalized_relations = $this->normalizeRelations($request_data->relations);
         $requested_relations = $normalized_relations;
-        $computed_columns = $this->extractComputedColumns($main_entity, $request_data->columns);
+        $request_columns = $this->requestColumns($main_model, $request_data->columns);
+        $computed_columns = $this->extractComputedColumns($main_entity, $request_columns);
         $computed_main = $computed_columns['main'];
         $computed_relations = $computed_columns['relations'];
         $computed_main_dependencies = $this->resolveComputedDependencies($main_model, $computed_main);
@@ -314,7 +319,7 @@ final class QueryBuilder
             }
         }
 
-        $columns = $this->groupColumns($main_entity, $request_data->columns);
+        $columns = $this->groupColumns($main_entity, $request_columns);
 
         foreach ($columns as $type => $cols) {
             if ($type === 'main' && $cols !== []) {
@@ -367,7 +372,11 @@ final class QueryBuilder
 
         if ($request_data instanceof ListRequestData && isset($request_data->sort)) {
             foreach ($request_data->sort as $column) {
-                $property = (string) $column->property;
+                $property = $this->mountedProperty($main_model, (string) $column->property);
+
+                if ($this->orderByToOneRelation($query, $property, $column->direction->value, $relation_authorizer, $request)) {
+                    continue;
+                }
 
                 if (! Str::contains($property, '.')) {
                     if (method_exists($main_model, $property)) {
@@ -557,6 +566,96 @@ final class QueryBuilder
         }
 
         return new FiltersGroup($kept, $filters->operator);
+    }
+
+    /**
+     * The requested columns with the attributes the main model mounts from its relation turned into columns of
+     * that relation: a client asks for `name`, not for `counterparty.name`, and does not know where it lives.
+     *
+     * @param  array<int,Column>  $columns
+     * @return array<int,Column>
+     */
+    private function requestColumns(Model $main_model, array $columns): array
+    {
+        if (! $main_model instanceof IMountsRelatedAttributes) {
+            return $columns;
+        }
+
+        $main_entity = $main_model->getTable();
+
+        return array_map(function (Column $column) use ($main_model, $main_entity): Column {
+            if ($column->type !== ColumnType::Column || preg_match('/^\w+\.(\w+)$/', $column->name, $matches) !== 1 || ! str_starts_with($column->name, $main_entity . '.')) {
+                return $column;
+            }
+
+            $mounted = $this->mountedProperty($main_model, $matches[1]);
+
+            return $mounted === $matches[1] ? $column : new Column($main_entity . '.' . $mounted, $column->type);
+        }, $columns);
+    }
+
+    /**
+     * `name` becomes `counterparty.name` when the model mounts `name` from its relation and the related table
+     * has a column of that name; any other property is returned as it is.
+     */
+    private function mountedProperty(Model $model, string $property): string
+    {
+        if (! $model instanceof IMountsRelatedAttributes || Str::contains($property, '.') || ModelPropertyResolver::resolve($model, $property) !== ModelPropertyResolver::MOUNTED) {
+            return $property;
+        }
+
+        $relation = RelationGuard::relationOf($model, $model->mountedRelation());
+
+        if (! $relation instanceof Relation || ! SchemaInspector::getInstance()->hasColumn($property, $relation->getRelated()->getTable(), $relation->getRelated()->getConnectionName())) {
+            return $property;
+        }
+
+        return $model->mountedRelation() . '.' . $property;
+    }
+
+    /**
+     * Orders the rows of the main query by a column of a relation that holds at most one record, through a
+     * correlated subquery: `counterparty.name` sorts the parties, not the counterparties a party loads. A
+     * to-many relation keeps its meaning (the order of the loaded related records), and a column the related
+     * table does not have is ignored. The caller needs the right to read the related entity.
+     *
+     * @param  Builder<Model>  $query
+     *
+     * @throws AuthorizationException when the caller may not read the related entity
+     */
+    private function orderByToOneRelation(Builder $query, string $property, string $direction, ?RelationAuthorizer $authorizer, ?Request $request): bool
+    {
+        if (mb_substr_count($property, '.') !== 1) {
+            return false;
+        }
+
+        [$relation_name, $column] = explode('.', $property);
+        $relation = RelationGuard::relationOf($query->getModel(), $relation_name);
+
+        if (! $relation instanceof BelongsTo && ! $relation instanceof HasOne) {
+            return false;
+        }
+
+        $related = $relation->getRelated();
+
+        if (! SchemaInspector::getInstance()->hasColumn($column, $related->getTable(), $related->getConnectionName())) {
+            return false;
+        }
+
+        if ($authorizer instanceof RelationAuthorizer && $request instanceof Request) {
+            throw_unless(
+                $authorizer->isReadable($request, $relation->getParent(), $related),
+                AuthorizationException::class,
+                sprintf('User not allowed to read %s through %s', $related->getTable(), $relation->getParent()->getTable()),
+            );
+        }
+
+        $query->orderBy(
+            $relation->getRelationExistenceQuery($related->newQueryWithoutScopes(), $query, [$related->qualifyColumn($column)]),
+            $direction,
+        );
+
+        return true;
     }
 
     /**
