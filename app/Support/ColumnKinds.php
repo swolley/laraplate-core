@@ -18,10 +18,9 @@ use Modules\Core\Inspector\SchemaInspector;
  *
  * The cast of the model decides first, except that a numeric schema type overrides a temporal cast. A column whose
  * cast says nothing about its kind is read by its schema type: the first attribute the inspector keeps for a column,
- * its `type_name`. `Column::$type` cannot serve,
- * because it is the Doctrine name of the raw type and a `numeric` or `double precision` column has none. The
- * name is lower-cased and cut of its precision and `unsigned` before it is mapped, so `decimal(15,4)` is
- * `decimal`.
+ * its `type_name`. `Column::$type` cannot serve, because it is the Doctrine name of the raw type and a `numeric` or
+ * `double precision` column has none. The name is lower-cased and cut of its precision and `unsigned` before it is
+ * mapped, so `decimal(15,4)` is `decimal`.
  *
  * `tinyint` is never numeric: on MySQL it is how a boolean is stored, and the precision that tells the two
  * apart is cut. `int4`, `float8` and the like are what PostgreSQL gives as `type_name`; the SQL name it gives
