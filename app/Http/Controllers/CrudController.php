@@ -16,6 +16,7 @@ use Illuminate\Database\RecordsNotFoundException as DatabaseRecordsNotFoundExcep
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use LogicException;
@@ -97,8 +98,9 @@ class CrudController extends Controller
      * the exception, which holds the SQL, and an aggregate answers a failure it did not foresee with a message of
      * its own. Never cached, because the figures follow the rows.
      *
-     * Answers: 200 `{data, meta}`; 422 `{error: {code, message, field?}}` for a request the contract refuses; the
-     * status of a refused permission; 500 `{error: {message}}`, reported, for anything else.
+     * Answers: 200 `{data, meta}`; 422 `{error: {code, message, field?}}` for a request the contract refuses, logged
+     * as a notice when it comes from an invalid argument; the status of a refused permission; 500 `{error: {message}}`,
+     * reported, for anything else.
      */
     final public function aggregate(AggregateRequest $request): Response
     {
@@ -121,7 +123,15 @@ class CrudController extends Controller
 
             return $this->aggregateRefusal($request, $exception->getMessage(), $field === null ? null : (string) $field);
         } catch (InvalidArgumentException $exception) {
-            // The guards of the list and of its filters: their message names fields, never SQL.
+            // The guards of the list and of its filters: their message names fields, never SQL. The framework and
+            // Carbon throw this type too, so every such refusal is logged, for an unexpected origin to show.
+            Log::notice('Aggregate request refused', [
+                'exception' => $exception::class,
+                'message' => $exception->getMessage(),
+                'module' => $request->route('module'),
+                'entity' => $request->route('entity'),
+            ]);
+
             return $this->aggregateRefusal($request, $exception->getMessage());
         } catch (Throwable $exception) {
             report($exception);

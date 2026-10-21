@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Enums\AggregateErrorCode;
@@ -163,7 +165,9 @@ it('answers a shape error with a structured 422', function (): void {
 });
 
 it('answers a request the validator refuses with INVALID_FIELD and does not report it', function (): void {
-    Exceptions::fake();
+    // The real handler, not the Exceptions fake: the fake records any exception it is not told to skip, while the
+    // handler asks the exception itself (its report() method) whether to log it.
+    Log::spy();
 
     $response = $this->actingAs(aggregateRouteViewer())->postJson(route('core.crud.aggregate', aggregateRouteParams()), [
         'group_by' => ['field' => 'group_name'],
@@ -174,8 +178,26 @@ it('answers a request the validator refuses with INVALID_FIELD and does not repo
     expect($response->json('error.code'))->toBe('INVALID_FIELD')
         ->and($response->json('error.field'))->toBe('measures');
 
-    Exceptions::assertNothingReported();
+    Log::shouldNotHaveReceived('error');
 });
+
+it('reports an aggregate refusal only when it is a fault of the deployment', function (bool $reportable): void {
+    Log::spy();
+    $refusal = new AggregateException(AggregateErrorCode::UnsupportedFunction, 'Time buckets are not supported on the "firebird" database driver.', 'group_by.bucket', $reportable);
+
+    app(ExceptionHandler::class)->report($refusal);
+
+    if ($reportable) {
+        Log::shouldHaveReceived('error')->once()->withArgs(
+            static fn (string $message, array $context): bool => $message === $refusal->getMessage() && ($context['exception'] ?? null) === $refusal,
+        );
+    } else {
+        Log::shouldNotHaveReceived('error');
+    }
+})->with([
+    'a fault of the deployment' => [true],
+    'a fault of the client' => [false],
+]);
 
 it('answers an unknown field with INVALID_FIELD', function (): void {
     $response = $this->actingAs(aggregateRouteViewer())->postJson(route('core.crud.aggregate', aggregateRouteParams()), [
@@ -234,7 +256,8 @@ it('answers a scope filter the list data refuses with INVALID_FIELD on filters',
         ]);
 });
 
-it('answers an invalid argument of the filters with INVALID_FIELD and its message', function (): void {
+it('answers an invalid argument with INVALID_FIELD and its message, and logs a notice', function (): void {
+    Log::spy();
     aggregateRouteFailingService(new InvalidArgumentException('"no_such_column" cannot be read: filters name only columns of the entity.'));
 
     $response = $this->actingAs(aggregateRouteViewer())->postJson(route('core.crud.aggregate', aggregateRouteParams()), [
@@ -247,6 +270,14 @@ it('answers an invalid argument of the filters with INVALID_FIELD and its messag
         'code' => 'INVALID_FIELD',
         'message' => '"no_such_column" cannot be read: filters name only columns of the entity.',
     ]);
+
+    Log::shouldHaveReceived('notice')->once()->with('Aggregate request refused', [
+        'exception' => InvalidArgumentException::class,
+        'message' => '"no_such_column" cannot be read: filters name only columns of the entity.',
+        'module' => 'core',
+        'entity' => 'settings',
+    ]);
+    Log::shouldNotHaveReceived('error');
 });
 
 it('answers a query failure with a generic message and reports it', function (): void {

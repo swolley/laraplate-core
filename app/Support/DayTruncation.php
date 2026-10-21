@@ -22,7 +22,7 @@ final class DayTruncation
      * @param  string  $driver  The name of the connection driver, as `Connection::getDriverName()` gives it.
      * @param  string  $wrappedColumn  A column already wrapped by the grammar of the connection, never request text.
      *
-     * @throws AggregateException When the driver has no expression.
+     * @throws AggregateException When the driver has no expression: a fault of the deployment, so it is reported.
      */
     public static function expression(string $driver, string $wrappedColumn): string
     {
@@ -35,6 +35,7 @@ final class DayTruncation
                 AggregateErrorCode::UnsupportedFunction,
                 sprintf('Time buckets are not supported on the "%s" database driver.', $driver),
                 'group_by.bucket',
+                reportable: true,
             ),
         };
     }

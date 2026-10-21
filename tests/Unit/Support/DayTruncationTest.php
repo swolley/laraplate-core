@@ -22,5 +22,6 @@ it('refuses a bucket on a driver it has no expression for', function (): void {
         ->toThrow(static fn (AggregateException $exception) => expect($exception->errorCode)->toBe(AggregateErrorCode::UnsupportedFunction)
             ->and($exception->errorCode->value)->toBe('UNSUPPORTED_FUNCTION')
             ->and($exception->field)->toBe('group_by.bucket')
+            ->and($exception->reportable)->toBeTrue()
             ->and($exception->getMessage())->toContain('firebird')->not->toContain('ordered_at'));
 });
