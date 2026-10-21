@@ -136,7 +136,7 @@ if (! function_exists('is_laraplate_owned_module')) {
      * Whether a module is an official Laraplate-owned distribution package.
      *
      * Resolution: App is never owned; module.json `laraplate_owned` when present;
-     * otherwise composer.json `name` matching `getlaraplate/laraplate-*`.
+     * otherwise composer.json `name` matching `getlaraplate/lara*`.
      */
     function is_laraplate_owned_module(string $name): bool
     {
@@ -185,7 +185,7 @@ if (! function_exists('laraplate_module_is_owned_at_path')) {
         $composer = json_decode((string) file_get_contents($composer_path), true);
         $package = is_array($composer) ? ($composer['name'] ?? null) : null;
 
-        return is_string($package) && str_starts_with($package, 'getlaraplate/laraplate-');
+        return is_string($package) && str_starts_with($package, 'getlaraplate/lara');
     }
 }
 
