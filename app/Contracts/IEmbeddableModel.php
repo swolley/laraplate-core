@@ -14,7 +14,7 @@ interface IEmbeddableModel
     public function prepareDataToEmbed(): ?string;
 
     /**
-     * @return MorphMany<\Modules\Core\Models\ModelEmbedding, $this>
+     * @return MorphMany<\Modules\Core\Models\ModelEmbedding, covariant \Illuminate\Database\Eloquent\Model>
      */
     public function embeddings(): MorphMany;
 }

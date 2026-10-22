@@ -18,7 +18,7 @@ use Illuminate\Support\Collection;
 final class ModelsRequireIndexing
 {
     /**
-     * @param  Collection<int, Model>  $models
+     * @param  Collection<int, covariant Model>  $models
      */
     public function __construct(
         public readonly Collection $models,

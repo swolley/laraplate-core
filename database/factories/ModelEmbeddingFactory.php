@@ -46,7 +46,8 @@ final class ModelEmbeddingFactory extends Factory
     public function configure(): self
     {
         return $this->afterMaking(function (ModelEmbedding $modelEmbedding): void {
-            if ($modelEmbedding->model_type === null) {
+            // Read raw: the column is NOT NULL once saved, but a made instance may not have it yet.
+            if ($modelEmbedding->getAttribute('model_type') === null) {
                 $modelEmbedding->forceFill([
                     'model_type' => ModelEmbedding::class,
                     'model_id' => fake()->randomNumber(),

@@ -83,6 +83,9 @@ trait Searchable
         return $this->cacheConnection;
     }
 
+    /**
+     * @param  iterable<int, static>|static  $models
+     */
     public function queueMakeSearchable($models): void
     {
         // A bulk run (an import) records the models and indexes them in bulk later.
@@ -90,16 +93,11 @@ trait Searchable
             return;
         }
 
-        $this->degradeWhenSearchEngineUnreachable(
-            'ensure indexes',
-            fn (): mixed => $this->ensureIndexesForModels($models),
-        );
+        $this->degradeWhenSearchEngineUnreachable('ensure indexes', function () use ($models): void {
+            $this->ensureIndexesForModels($models);
+        });
 
-        if (! is_iterable($models)) {
-            $models = collect([$models]);
-        }
-
-        $collection = $models instanceof Collection ? $models->values() : collect($models)->values();
+        $collection = self::modelsCollection($models);
         $sync = ! config('scout.queue');
 
         // Bulk import (many models at once): pre-process the whole chunk in one
@@ -146,16 +144,16 @@ trait Searchable
         }
     }
 
+    /**
+     * @param  iterable<int, static>|static  $models
+     */
     public function syncMakeSearchable($models): void
     {
-        $this->degradeWhenSearchEngineUnreachable(
-            'ensure indexes',
-            fn (): mixed => $this->ensureIndexesForModels($models),
-        );
+        $this->degradeWhenSearchEngineUnreachable('ensure indexes', function () use ($models): void {
+            $this->ensureIndexesForModels($models);
+        });
 
-        if (! is_iterable($models)) {
-            $models = collect([$models]);
-        }
+        $models = self::modelsCollection($models);
 
         foreach ($models as $model) {
             // Emit event for sync mode
@@ -202,8 +200,8 @@ trait Searchable
      * pass already loaded. A model without toSearchableWith(), or a plain
      * (non-Eloquent) collection, is returned untouched.
      *
-     * @param  Collection<int, static>  $models
-     * @return Collection<int, static>
+     * @param  Collection<int, covariant Model>  $models
+     * @return Collection<int, covariant Model>
      */
     public function makeSearchableUsing(Collection $models): Collection
     {
@@ -229,23 +227,25 @@ trait Searchable
             return;
         }
 
-        $this->degradeWhenSearchEngineUnreachable(
-            'ensure indexes',
-            fn (): mixed => $this->ensureIndexesForModels($models),
-        );
+        $this->degradeWhenSearchEngineUnreachable('ensure indexes', function () use ($models): void {
+            $this->ensureIndexesForModels($models);
+        });
 
         $this->bulkQueueMakeSearchable($models->values());
     }
 
     /**
      * Extends the standard method with support for embeddings and other data.
+     *
+     * @return array<string, mixed>
      */
     public function toSearchableArray(): array
     {
         $engine = $this->searchableUsing();
+        $key = $this->getKey();
 
         $array = [
-            'id' => (string) $this->getKey(),
+            'id' => is_scalar($key) ? (string) $key : '',
             'connection' => $this->getConnectionName() ?: 'default',
             'entity' => $this->getTable(),
             self::$indexedAtField => now()->utc()->toIso8601ZuluString(),
@@ -261,17 +261,19 @@ trait Searchable
         }
 
         // Add embeddings if available (agnostic array: no locale in ES, one entry per ModelEmbedding row)
-        if ($this->vectorSearchEnabled() && $engine instanceof ISearchEngine && $engine->supportsVectorSearch() && method_exists($this, 'embeddings')) {
+        if ($this->vectorSearchEnabled() && $engine instanceof ISearchEngine && $engine->supportsVectorSearch()) {
             // Reuse the eager-loaded relation on the bulk path (adaptiveBulkIndex
             // pre-loads it) and query only when it is not loaded, so serializing a
             // chunk does not fire one embeddings query per model.
             $model_key = VectorModelContext::get();
-            $embeddings = $this->relationLoaded('embeddings')
-                ? $this->getRelation('embeddings')
+            $loaded = $this->relationLoaded('embeddings') ? $this->getRelation('embeddings') : null;
+            $embeddings = $loaded instanceof Collection
+                ? $loaded
                 : ($model_key !== null ? $this->embeddings()->where('model_key', $model_key)->get() : $this->embeddings()->get());
             $vectors = $embeddings
-                ->when($model_key !== null, static fn ($rows) => $rows->filter(static fn (Model $e): bool => $model_key === $e->getAttribute('model_key')))
-                ->map(static fn (Model $e): array => ['vector' => $e->getAttribute('embedding')])
+                ->whereInstanceOf(ModelEmbedding::class)
+                ->when($model_key !== null, static fn (Collection $rows): Collection => $rows->filter(static fn (ModelEmbedding $e): bool => $model_key === $e->model_key))
+                ->map(static fn (ModelEmbedding $e): array => ['vector' => $e->embedding])
                 ->values()->all();
 
             if ($vectors !== []) {
@@ -336,9 +338,8 @@ trait Searchable
         // Reuse the eager-loaded translations relation (bulk path) so this does not
         // fire one query per locale per model; getTranslation() always queries, so
         // fall back to it only when the relation is not loaded (per-model path).
-        $loaded_translations = $this->relationLoaded('translations')
-            ? $this->getRelation('translations')->keyBy('locale')
-            : null;
+        $loaded = $this->relationLoaded('translations') ? $this->getRelation('translations') : null;
+        $loaded_translations = $loaded instanceof Collection ? $loaded->keyBy('locale') : null;
 
         foreach ($locales as $loc) {
             // with_fallback: false — a locale with no translation row of its own must be
@@ -346,9 +347,11 @@ trait Searchable
             // is on by default (Content), so getTranslation($loc) alone would return the
             // same default-locale row for every available locale, mislabeling embeddings.
             // The loaded relation, keyed by locale, gives the own-locale row (no fallback).
-            $translation = $loaded_translations !== null
-                ? ($loaded_translations[$loc] ?? null)
-                : $this->getTranslation($loc, with_fallback: false);
+            $translation = match (true) {
+                $loaded_translations !== null => $loaded_translations[$loc] ?? null,
+                method_exists($this, 'getTranslation') => $this->getTranslation($loc, with_fallback: false),
+                default => null,
+            };
 
             if (! $translation) {
                 continue;
@@ -367,6 +370,8 @@ trait Searchable
     /**
      * Relationship with model embeddings.
      * ModelEmbedding is in Core (structure), AI module handles generation/population.
+     *
+     * @return MorphMany<ModelEmbedding, $this>
      */
     public function embeddings(): MorphMany
     {
@@ -376,6 +381,8 @@ trait Searchable
     /**
      * Get field mapping for search engine
      * Convert generic field definitions to the format required by the current search engine.
+     *
+     * @return array<string, mixed>
      */
     public function getSearchMapping(?SchemaDefinition $schema = null): array
     {
@@ -385,7 +392,7 @@ trait Searchable
 
             foreach ($document as $key => $value) {
                 if ($key === 'embedding') {
-                    $schema->addField(new FieldDefinition($key, FieldType::Vector, [IndexType::Searchable, IndexType::Vector], ['dimensions' => (int) config('core.search.vector.dimensions', 384)]));
+                    $schema->addField(new FieldDefinition($key, FieldType::Vector, [IndexType::Searchable, IndexType::Vector], ['dimensions' => self::configInt('core.search.vector.dimensions', 384)]));
                 } else {
                     $schema->addField(new FieldDefinition($key, FieldType::fromValue($value), [IndexType::Searchable]));
                 }
@@ -431,7 +438,8 @@ trait Searchable
             }
 
             if ($needs_creation) {
-                call_user_func([$engine, 'createIndex'], $this);
+                // Scout's native engines create an index by name.
+                $engine->createIndex($this->searchableAs());
 
                 return true;
             }
@@ -495,6 +503,33 @@ trait Searchable
     }
 
     /**
+     * The models Scout hands over (one model or several) as a list.
+     *
+     * @param  iterable<int, static>|static  $models
+     * @return Collection<int, static>
+     */
+    private static function modelsCollection($models): Collection
+    {
+        $list = [];
+
+        foreach (is_iterable($models) ? $models : [$models] as $model) {
+            $list[] = $model;
+        }
+
+        return collect($list);
+    }
+
+    /**
+     * A number read from the configuration, which an env variable may give as a numeric string.
+     */
+    private static function configInt(string $key, int $default): int
+    {
+        $value = config($key, $default);
+
+        return is_numeric($value) ? (int) $value : $default;
+    }
+
+    /**
      * Bulk path: pre-process every model in the chunk together (a listener may
      * embed them in one batched call), then write the engine in adaptive
      * batches. The per-model event fan-out is skipped here on purpose.
@@ -510,15 +545,13 @@ trait Searchable
         // these same instances, so the loads are reused across both.
         $this->eagerLoadForIndexing($models);
 
-        $this->degradeWhenSearchEngineUnreachable(
-            'bulk pre-process',
-            fn (): mixed => event(new ModelsRequireIndexing($models, true)),
-        );
+        $this->degradeWhenSearchEngineUnreachable('bulk pre-process', static function () use ($models): void {
+            event(new ModelsRequireIndexing($models, true));
+        });
 
-        $this->degradeWhenSearchEngineUnreachable(
-            'bulk index',
-            fn (): mixed => $this->adaptiveBulkIndex($models),
-        );
+        $this->degradeWhenSearchEngineUnreachable('bulk index', function () use ($models): void {
+            $this->adaptiveBulkIndex($models);
+        });
     }
 
     /**
@@ -539,21 +572,15 @@ trait Searchable
         // Wrap in an Eloquent collection (the chunk may be a base collection) to
         // reach load/loadMissing; both load onto the shared model instances, so
         // $models and every later chunk see the relations too.
-        $chunk = $sample->newCollection($models->all());
+        $chunk = new EloquentCollection($models->all());
 
-        $relations = [];
-
-        if (method_exists($sample, 'embeddings')) {
-            $relations[] = 'embeddings';
-        }
+        $relations = ['embeddings'];
 
         if (class_uses_trait($sample, HasTranslations::class)) {
             $relations[] = 'translations';
         }
 
-        if ($relations !== []) {
-            $chunk->loadMissing($relations);
-        }
+        $chunk->loadMissing($relations);
 
         // The model's own Scout hook for preloading the relations its
         // toSearchableArray() reads (contributors, taxonomies, ...). Our direct
@@ -573,12 +600,12 @@ trait Searchable
     private function adaptiveBulkIndex(Collection $models): void
     {
         $engine = $this->searchableUsing();
-        $max = max(1, (int) config('core.bulk_index_batch', 100));
+        $max = max(1, self::configInt('core.bulk_index_batch', 100));
 
         $controller = new AdaptiveBatchController(minBatch: 1, maxBatch: $max, startBatch: $max);
 
         $controller->run(
-            $models->all(),
+            array_values($models->all()),
             function (array $chunk) use ($engine): array {
                 $engine->update($this->newCollection($chunk));
 
@@ -616,6 +643,9 @@ trait Searchable
         }
     }
 
+    /**
+     * @param  iterable<int, static>|static  $models
+     */
     private function ensureIndexesForModels($models): void
     {
         if (! is_iterable($models)) {
@@ -652,11 +682,15 @@ trait Searchable
 
     private function mediaSurrogateText(): string
     {
-        /** @var Collection<int, Model> $media */
-        $media = $this->relationLoaded('media') ? $this->getRelation('media') : $this->media()->get();
+        if (! $this instanceof HasMedia) {
+            return '';
+        }
+
+        $loaded = $this->relationLoaded('media') ? $this->getRelation('media') : null;
+        $media = $loaded instanceof Collection ? $loaded : $this->media()->get();
 
         return mb_trim(implode(' ', $media
-            ->filter(static fn (Model $item): bool => $item instanceof Media)
+            ->whereInstanceOf(Media::class)
             ->map(static fn (Media $item): string => $item->ownerSurrogateText())
             ->filter(static fn (string $text): bool => $text !== '')
             ->all()));
@@ -681,6 +715,8 @@ trait Searchable
 
     /**
      * Check if a value is valid for embedding.
+     *
+     * @phpstan-assert-if-true non-empty-string $value
      */
     private function isValidEmbedValue(mixed $value): bool
     {

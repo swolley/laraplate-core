@@ -12,6 +12,18 @@ use Modules\Core\Database\Factories\ModelEmbeddingFactory;
 use Modules\Core\Enums\CoreTables;
 use Override;
 
+/**
+ * One vector of a model: the model it belongs to, the translation it was derived from and the embedding
+ * profile that produced it.
+ *
+ * @property int $id
+ * @property string $model_type
+ * @property int|string $model_id
+ * @property mixed $embedding
+ * @property string|null $locale
+ * @property string|null $model_key
+ * @property string|null $content_hash
+ */
 final class ModelEmbedding extends Model
 {
     use HasFactory;
