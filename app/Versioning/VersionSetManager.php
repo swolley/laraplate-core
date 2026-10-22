@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use LogicException;
 use Modules\Core\Contracts\IOptimisticLockableModel;
+use Modules\Core\Enums\VersionCaptureQuality;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Locking\Exceptions\StaleModelLockingException;
 use Modules\Core\Models\VersionSet;
@@ -41,27 +42,26 @@ final class VersionSetManager implements VersionSetManagerInterface
             return $this->runNested($root, $operation, $options);
         }
 
-        $connection = $root->model()->getConnection();
-        $connection_name = $root->connectionName();
-        $resolved_options = $options ?? new VersionSetOptions;
-        $this->scope = new VersionScope($connection_name);
+        return $this->runOutermost($root, $operation, $options ?? new VersionSetOptions, VersionCaptureQuality::Atomic);
+    }
 
-        try {
-            $this->enlist($connection_name);
-
-            return $connection->transaction(function () use ($root, $operation, $resolved_options): mixed {
-                $result = $this->runInSet($this->openSet($root, $resolved_options, lock: true), $operation);
-                $this->enlist($root->connectionName());
-
-                foreach ($this->activeScope()->sets() as $set) {
-                    $set->finish();
-                }
-
-                return $result;
-            });
-        } finally {
-            $this->scope = null;
+    /**
+     * Opens a scope for a change whose business statement already ran, as the writer does when no scope was
+     * active. Its sets are atomic only when the application had a transaction open on the root's connection, so the
+     * business statement and the history commit together; otherwise they are best effort (D47, D52).
+     */
+    #[Override]
+    public function runAfterTheFact(VersionSetRoot $root, Closure $operation, VersionSetOptions $options): mixed
+    {
+        if ($this->scope instanceof VersionScope) {
+            return $this->runNested($root, $operation, $options);
         }
+
+        $capture = ApplicationTransactions::isOpenOn($root->model()->getConnection())
+            ? VersionCaptureQuality::Atomic
+            : VersionCaptureQuality::BestEffort;
+
+        return $this->runOutermost($root, $operation, $options, $capture);
     }
 
     #[Override]
@@ -103,6 +103,34 @@ final class VersionSetManager implements VersionSetManagerInterface
     public function current(): ?ActiveVersionSet
     {
         return $this->scope?->current();
+    }
+
+    private function runOutermost(
+        VersionSetRoot $root,
+        Closure $operation,
+        VersionSetOptions $resolved_options,
+        VersionCaptureQuality $capture,
+    ): mixed {
+        $connection = $root->model()->getConnection();
+        $connection_name = $root->connectionName();
+        $this->scope = new VersionScope($connection_name, $capture);
+
+        try {
+            $this->enlist($connection_name);
+
+            return $connection->transaction(function () use ($root, $operation, $resolved_options): mixed {
+                $result = $this->runInSet($this->openSet($root, $resolved_options, lock: true), $operation);
+                $this->enlist($root->connectionName());
+
+                foreach ($this->activeScope()->sets() as $set) {
+                    $set->finish();
+                }
+
+                return $result;
+            });
+        } finally {
+            $this->scope = null;
+        }
     }
 
     /**
@@ -151,7 +179,7 @@ final class VersionSetManager implements VersionSetManagerInterface
         }
 
         $this->validateRevertedFrom($root, $options);
-        $set = new ActiveVersionSet($root, $root->connectionName(), $options);
+        $set = new ActiveVersionSet($root, $root->connectionName(), $options, $this->activeScope()->capture());
         $this->activeScope()->add($set);
 
         return $set;

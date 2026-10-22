@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Versioning;
 
 use LogicException;
+use Modules\Core\Enums\VersionCaptureQuality;
 use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Models\VersionSet;
 use Modules\Core\Versioning\Data\VersionSetOptions;
@@ -35,7 +36,13 @@ final class ActiveVersionSet
         private readonly VersionSetRoot $root,
         private readonly string $connection_name,
         private readonly VersionSetOptions $options,
+        private readonly VersionCaptureQuality $capture = VersionCaptureQuality::Atomic,
     ) {}
+
+    public function capture(): VersionCaptureQuality
+    {
+        return $this->capture;
+    }
 
     public function root(): VersionSetRoot
     {
@@ -68,6 +75,7 @@ final class ActiveVersionSet
             'root_table_ref' => $this->root->tableName(),
             config('versionable.user_foreign_key', 'user_id') => $this->options->actorId(),
             'kind' => $this->stored_kind ?? $this->options->kind,
+            'capture' => $this->capture,
             'reason' => $this->options->reason,
             'reverted_from_set_id' => $this->options->revertedFromId(),
         ])->saveOrFail();

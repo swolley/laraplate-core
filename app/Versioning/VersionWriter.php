@@ -24,7 +24,7 @@ final readonly class VersionWriter implements VersionWriterInterface
     public function write(VersionChange $change): Version
     {
         if ($this->manager->current() === null) {
-            $written = $this->manager->run(
+            $written = $this->manager->runAfterTheFact(
                 VersionSetRoot::forModel($change->model),
                 fn (): Version => $this->write($change),
                 new VersionSetOptions(actor: $change->userId),

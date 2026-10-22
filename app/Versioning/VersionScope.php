@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Versioning;
 
 use LogicException;
+use Modules\Core\Enums\VersionCaptureQuality;
 use Modules\Core\Versioning\Data\VersionSetRoot;
 
 /**
@@ -29,7 +30,19 @@ final class VersionScope
      */
     private array $stack = [];
 
-    public function __construct(private readonly string $connection_name) {}
+    /**
+     * @param  VersionCaptureQuality  $capture  how every set of the scope was captured: atomic when its transaction
+     *                                          was open before the business statements (D47, D52)
+     */
+    public function __construct(
+        private readonly string $connection_name,
+        private readonly VersionCaptureQuality $capture = VersionCaptureQuality::Atomic,
+    ) {}
+
+    public function capture(): VersionCaptureQuality
+    {
+        return $this->capture;
+    }
 
     public function connectionName(): string
     {
