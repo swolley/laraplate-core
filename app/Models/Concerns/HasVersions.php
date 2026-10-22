@@ -75,11 +75,11 @@ trait HasVersions
 
     /**
      * The delete captured on `deleting`, written on `deleted`. A hard delete keeps
-     * the whole image and has no strategy to apply; a soft delete records the one
-     * column that moved. The declared shape said neither, and named a `strategy`
-     * key the hard branch never sets.
+     * the whole image, a SNAPSHOT tombstone; a soft delete records the one column
+     * that moved, always as a DIFF whatever the model's strategy, since a row
+     * labelled SNAPSHOT is taken for a complete image by the reconstruction (C08).
      *
-     * @var array{mode: 'hard', original: array<string, mixed>}|array{mode: 'soft', strategy: VersionStrategy, deleted_at_column: string, original: array<string, mixed>}|null
+     * @var array{mode: 'hard', original: array<string, mixed>}|array{mode: 'soft', deleted_at_column: string, original: array<string, mixed>}|null
      */
     private ?array $pending_version_delete = null;
 
@@ -643,7 +643,6 @@ trait HasVersions
 
         $this->pending_version_delete = [
             'mode' => 'soft',
-            'strategy' => $strategy,
             'deleted_at_column' => $deleted_at_column,
             'original' => [$deleted_at_column => $this->getRawOriginal($deleted_at_column)],
         ];
@@ -682,7 +681,7 @@ trait HasVersions
                 [$deleted_at_column => $this->getRawOriginal($deleted_at_column)],
                 $this->encryptedVersionable,
             ),
-            strategy: $pending['strategy'],
+            strategy: VersionStrategy::DIFF,
             userId: $this->getVersionUserId(),
             encryptedAttributes: $this->encryptedVersionable,
         ));

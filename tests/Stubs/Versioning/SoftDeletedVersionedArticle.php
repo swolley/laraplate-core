@@ -21,4 +21,9 @@ final class SoftDeletedVersionedArticle extends Model
     protected array $versionable = ['title'];
 
     protected VersionStrategy $versionStrategy = VersionStrategy::DIFF;
+
+    public function useVersionStrategy(VersionStrategy $strategy): void
+    {
+        $this->versionStrategy = $strategy;
+    }
 }

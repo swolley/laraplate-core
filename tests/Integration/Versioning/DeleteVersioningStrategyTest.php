@@ -78,3 +78,16 @@ it('exposes trashing versions and excludes the restore that clears deleted_at', 
     expect($trashing_versions)->toHaveCount(1)
         ->and($trashing_versions->first()->getKey())->toBe($trashing_version_id);
 });
+
+it('records a soft delete of a SNAPSHOT model as a DIFF of deleted_at', function (): void {
+    $article = SoftDeletedVersionedArticle::query()->create(['title' => 'First']);
+    $article->useVersionStrategy(VersionStrategy::SNAPSHOT);
+
+    $article->delete();
+
+    $trashing = Version::query()->latest('id')->firstOrFail();
+
+    expect($trashing->change_type)->toBe(VersionChangeType::Trashed)
+        ->and($trashing->version_strategy)->toBe(VersionStrategy::DIFF)
+        ->and(array_keys($trashing->contents))->toBe(['deleted_at']);
+});
