@@ -21,6 +21,7 @@ beforeEach(function (): void {
         $table->id();
         $table->string('title');
         $table->string('subtitle')->nullable();
+        $table->string('status')->default('draft');
         $table->timestamps();
         $table->softDeletes();
     });
@@ -103,4 +104,21 @@ it('leaves a record in the bin when reverted to a revision taken before it was t
 
     expect($live->title)->toBe('T1')
         ->and($live->deleted_at)->not->toBeNull();
+});
+
+it('writes the creation row as a complete image, database defaults included (C09)', function (): void {
+    $document = VersionedDocument::query()->create(['title' => 'T1']);
+
+    expect($document->versions()->where('change_type', VersionChangeType::Created)->firstOrFail()->contents)
+        ->toMatchArray(['title' => 'T1', 'status' => 'draft']);
+});
+
+it('rebuilds a column that took its database default at creation (C09)', function (): void {
+    $document = VersionedDocument::query()->create(['title' => 'T1']);
+    $created = last_version_of($document);
+    $document->update(['status' => 'published']);
+
+    $document->revertToVersion($created->getKey());
+
+    expect($document->fresh()->status)->toBe('draft');
 });

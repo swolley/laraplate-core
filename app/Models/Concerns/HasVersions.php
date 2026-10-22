@@ -362,8 +362,10 @@ trait HasVersions
         //     return $model->firstVersion()->first();
         // }
 
+        // Read back after the insert: the attributes assigned in PHP miss every column that took a database
+        // default, and the creation row is the anchor a revert rebuilds from (C09).
         /** @var self $model */
-        $contents = $model->filterVersionableImage($model->getAttributes());
+        $contents = $model->filterVersionableImage($model->getRefreshedModel($model)->getRawOriginal());
 
         return resolve(VersionWriterInterface::class)->write(new VersionChange(
             model: $model,
