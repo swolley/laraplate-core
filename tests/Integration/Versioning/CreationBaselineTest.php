@@ -72,3 +72,38 @@ it('never stores a revert set as a baseline', function (): void {
 
     expect(stored_set_kinds())->toBe([VersionSetKind::Baseline, VersionSetKind::Change, VersionSetKind::Revert]);
 });
+
+it('stores the creation of a root inside another root scope as that root own baseline', function (): void {
+    $outer = VersionedDocument::query()->create(['title' => 'Outer']);
+    $before = VersionSet::query()->max('id');
+    $manager = app(VersionSetManagerInterface::class);
+
+    $manager->run(VersionSetRoot::forModel($outer), function () use ($outer): void {
+        $outer->update(['title' => 'Outer edited']);
+        VersionedDocument::query()->create(['title' => 'Inner']);
+    });
+
+    $sets = VersionSet::query()->where('id', '>', $before)->orderBy('id')->get();
+
+    expect($sets->pluck('kind')->all())->toBe([VersionSetKind::Change, VersionSetKind::Baseline])
+        ->and($sets->pluck('root_id')->all())->toBe([(string) $outer->getKey(), (string) VersionedDocument::query()->where('title', 'Inner')->value('id')]);
+});
+
+it('lets a nested run with ordinary options join the baseline set of a root created inside another scope', function (): void {
+    $outer = VersionedDocument::query()->create(['title' => 'Outer']);
+    $inner = new VersionedDocument(['title' => 'Inner']);
+    $before = VersionSet::query()->max('id');
+    $manager = app(VersionSetManagerInterface::class);
+
+    $manager->run(VersionSetRoot::forModel($outer), function () use ($inner, $manager): void {
+        $manager->run(VersionSetRoot::forModel($inner), function () use ($inner, $manager): void {
+            $inner->save();
+            $manager->run(VersionSetRoot::forModel($inner), fn () => $inner->update(['title' => 'Inner edited']), new VersionSetOptions);
+        });
+    });
+
+    $set = VersionSet::query()->where('id', '>', $before)->sole();
+
+    expect($set->kind)->toBe(VersionSetKind::Baseline)
+        ->and($set->versions()->count())->toBe(2);
+});
