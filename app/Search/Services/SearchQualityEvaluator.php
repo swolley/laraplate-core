@@ -24,7 +24,7 @@ final readonly class SearchQualityEvaluator
     private const float DEFAULT_THRESHOLD_AVG_SCORE = 1.5;
 
     /**
-     * @param  list<array{id: string, score: float}>  $results  hits as the search returns them (other keys are ignored)
+     * @param  list<array{id: string, score: float, ...}>  $results  hits as the search returns them (other keys are ignored)
      * @return array{avg_score: float, max_score: float, count: int, unique_ids: int}
      */
     public function evaluate(array $results): array

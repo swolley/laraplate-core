@@ -7,6 +7,7 @@ namespace Modules\Core\Search\Jobs;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use Laravel\Scout\Searchable;
+use Modules\Core\Contracts\ISearchableModel;
 
 /**
  * Job for reindexing all models of a specified class
@@ -39,7 +40,7 @@ final class ReindexSearchJob extends CommonSearchJob
 
         $model_instance = new $this->model_class();
 
-        if (! $this->isModelSearchable()) {
+        if (! $this->isModelSearchable() || ! $model_instance instanceof ISearchableModel) {
             $this->logModelNotSearchableError();
 
             return;
@@ -96,16 +97,16 @@ final class ReindexSearchJob extends CommonSearchJob
      * so rows that a global scope such as `LocaleScope` hides from `query()` (e.g.
      * content with no translation in the current locale) are still reindexed.
      */
-    private function bulkReindex(object $model_instance, string $index_name): void
+    private function bulkReindex(ISearchableModel $model_instance, string $index_name): void
     {
-        $model_instance::makeAllSearchableQuery()->searchable();
+        $model_instance::reindex();
         Log::info('Bulk reindex job completed successfully', [
             'model' => $this->model_class,
             'index' => $index_name,
         ]);
     }
 
-    private function individualReindex(object $model_instance): void
+    private function individualReindex(ISearchableModel $model_instance): void
     {
         $count = 0;
         $model_instance::makeAllSearchableQuery()->chunk($this->batch_size, function (iterable $models) use (&$count): void {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Search\Engines;
 
 use Closure;
+use Elastic\Elasticsearch\Response\Elasticsearch;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use Modules\Core\Helpers\LocaleContext;
@@ -36,7 +37,7 @@ final readonly class ElasticsearchLocaleTextFields
      * booleans and vectors, which are not text, and `locales`, which would make the word "it" match every
      * document available in Italian.
      *
-     * @param  array<string, mixed>  $properties  The `properties` of an Elasticsearch mapping.
+     * @param  array<array-key, mixed>  $properties  The `properties` of an Elasticsearch mapping.
      * @param  list<string>  $locales  The languages the results are requested in.
      * @param  list<string>  $available  Every language the application has, to tell an object per language from any other.
      * @return list<string>
@@ -61,11 +62,13 @@ final readonly class ElasticsearchLocaleTextFields
             return [];
         }
 
-        return self::fromProperties($properties, $locales, LocaleContext::getAvailable());
+        return self::fromProperties($properties, $locales, array_values(array_filter(LocaleContext::getAvailable(), is_string(...))));
     }
 
     /**
-     * @param  array<string, mixed>  $properties
+     * The mapping is decoded JSON: a key is a field name only when it is a string.
+     *
+     * @param  array<array-key, mixed>  $properties
      * @param  list<string>  $locales
      * @param  list<string>  $available
      * @param  list<string>  $fields
@@ -114,7 +117,20 @@ final readonly class ElasticsearchLocaleTextFields
     }
 
     /**
-     * @return array<string, mixed>|null
+     * The `mappings.properties` of an index definition, or null when it has none.
+     *
+     * @return array<array-key, mixed>|null
+     */
+    private static function mappingProperties(mixed $definition): ?array
+    {
+        $mappings = is_array($definition) ? ($definition['mappings'] ?? null) : null;
+        $properties = is_array($mappings) ? ($mappings['properties'] ?? null) : null;
+
+        return is_array($properties) ? $properties : null;
+    }
+
+    /**
+     * @return array<array-key, mixed>|null
      */
     private function live(string $index): ?array
     {
@@ -123,19 +139,21 @@ final readonly class ElasticsearchLocaleTextFields
         }
 
         try {
-            return Cache::remember('search:es-mapping:' . $index, self::CACHE_SECONDS, static function () use ($index): ?array {
-                $mapping = ElasticsearchService::getInstance()->client->indices()->getMapping(['index' => $index])->asArray();
-                $properties = (array_values($mapping)[0] ?? [])['mappings']['properties'] ?? null;
+            $properties = Cache::remember('search:es-mapping:' . $index, self::CACHE_SECONDS, static function () use ($index): ?array {
+                $response = ElasticsearchService::getInstance()->client->indices()->getMapping(['index' => $index]);
 
-                return is_array($properties) ? $properties : null;
+                // An asynchronous client answers a promise: there is no mapping to read now.
+                return $response instanceof Elasticsearch ? self::mappingProperties(array_values($response->asArray())[0] ?? null) : null;
             });
+
+            return is_array($properties) ? $properties : null;
         } catch (Throwable) {
             return null;
         }
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     private function declared(Model $model): array
     {
@@ -143,9 +161,6 @@ final readonly class ElasticsearchLocaleTextFields
             return [];
         }
 
-        $mapping = $model->getSearchMapping();
-        $properties = is_array($mapping) ? ($mapping['mappings']['properties'] ?? null) : null;
-
-        return is_array($properties) ? $properties : [];
+        return self::mappingProperties($model->getSearchMapping()) ?? [];
     }
 }

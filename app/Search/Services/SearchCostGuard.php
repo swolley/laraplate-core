@@ -22,7 +22,7 @@ final readonly class SearchCostGuard
 
     public function maxRetries(): int
     {
-        return max(0, (int) config('core.search.max_retries', 2));
+        return max(0, self::configInt('core.search.max_retries', 2));
     }
 
     public function clampRetries(int $requested): int
@@ -36,8 +36,18 @@ final readonly class SearchCostGuard
      */
     public function allowsDeep(string $person): bool
     {
-        $per_minute = max(1, (int) config('core.search.deep_per_minute', 6));
+        $per_minute = max(1, self::configInt('core.search.deep_per_minute', 6));
 
         return RateLimiter::attempt(self::LIMITER . ':' . $person, $per_minute, static fn (): bool => true, 60) === true;
+    }
+
+    /**
+     * A limit read from the configuration, which an env variable may give as a numeric string.
+     */
+    private static function configInt(string $key, int $default): int
+    {
+        $value = config($key, $default);
+
+        return is_numeric($value) ? (int) $value : $default;
     }
 }

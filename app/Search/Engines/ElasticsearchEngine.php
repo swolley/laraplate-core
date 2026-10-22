@@ -97,8 +97,6 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILoca
             }
 
             // Get mapping from the model
-            $schema = [];
-
             if (method_exists($model, 'getSearchMapping')) {
                 $schema = $model->getSearchMapping();
             } elseif (method_exists($model, 'toSearchableIndex')) {
@@ -699,7 +697,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILoca
                 return null;
             }
 
-            $dimensions = ElasticsearchService::getInstance()->getMapping($collection)['embeddings']['properties']['vector']['dims'] ?? null;
+            $dimensions = data_get(ElasticsearchService::getInstance()->getMapping($collection), 'embeddings.properties.vector.dims');
 
             return is_numeric($dimensions) ? (int) $dimensions : null;
         } catch (Exception) {
@@ -942,7 +940,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILoca
      * restricted the same way: by the same filters, and by the fields of the requested language.
      *
      * @param  Builder<covariant Model>  $builder
-     * @return array<string, mixed>|null
+     * @return array{index: string, body: array<string, mixed>, size: int}|null
      */
     public function buildVectorSearchParams(Builder $builder): ?array
     {
@@ -1006,7 +1004,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILoca
      * matched on that language's fields only, so an Italian request never matches words in the English fields.
      *
      * @param  Builder<covariant Model>  $builder
-     * @return array<string, mixed>|null
+     * @return array{index: string, body: array<string, mixed>, from: int, size: int}|null
      */
     public function buildKeywordSearchParams(Builder $builder, int $perPage, int $page): ?array
     {
@@ -1066,7 +1064,7 @@ final class ElasticsearchEngine extends BaseElasticsearchEngine implements ILoca
     {
         $mapping = method_exists($model, 'getSearchMapping') ? $model->getSearchMapping() : [];
 
-        return is_array($mapping) && is_array($mapping['mappings']['properties']['locales'] ?? null);
+        return is_array(data_get($mapping, 'mappings.properties.locales'));
     }
 
     /**

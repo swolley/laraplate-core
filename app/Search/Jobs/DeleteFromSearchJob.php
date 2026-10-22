@@ -47,10 +47,8 @@ final class DeleteFromSearchJob extends CommonSearchJob
                     $client->collections[$this->index]->documents[$this->document_id]->delete();
                     $success = true;
                 } catch (Exception $e) {
-                    // Document not found is not an error
-                    if (mb_strpos($e->getMessage(), 'Not Found') !== false || $e->getCode() === 404) {
-                        $success = false;
-                    } else {
+                    // Document not found is not an error: $success stays false.
+                    if (mb_strpos($e->getMessage(), 'Not Found') === false && $e->getCode() !== 404) {
                         throw $e;
                     }
                 }

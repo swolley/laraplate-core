@@ -309,7 +309,8 @@ final readonly class AdvancedSearchService
     {
         $retrieval = $this->planSection($plan, 'retrieval');
         $retrieval['use_fulltext'] = true;
-        $retrieval['size'] = min(200, max($per_page, (int) ($retrieval['size'] ?? $per_page)) * 2);
+        $size = $retrieval['size'] ?? null;
+        $retrieval['size'] = min(200, max($per_page, is_numeric($size) ? (int) $size : $per_page) * 2);
 
         if ($strategy->embedder instanceof ITextEmbedder && (bool) config('core.search.vector.enabled', false)) {
             $retrieval['use_vector'] = true;

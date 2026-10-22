@@ -515,7 +515,8 @@ final class DatabaseEngine extends BaseDatabaseEngine implements ISearchEngine
         }
 
         $dimensions = (int) $configured_dimensions;
-        $operator = PgvectorProfileIndex::distanceOperator((string) config('core.search.vector.similarity', 'cosine'));
+        $similarity = config('core.search.vector.similarity', 'cosine');
+        $operator = PgvectorProfileIndex::distanceOperator(is_scalar($similarity) ? (string) $similarity : '');
         $distance = "\"embedding\"::vector({$dimensions}) {$operator} ?::vector";
 
         $query = ModelEmbedding::query()

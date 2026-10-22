@@ -277,7 +277,7 @@ trait CommonEngineFunctions
      */
     private function resolveVectorFieldFromMapping(array $mapping): ?string
     {
-        $properties = $mapping['mappings']['properties'] ?? null;
+        $properties = data_get($mapping, 'mappings.properties');
 
         if (is_array($properties)) {
             foreach ($properties as $name => $definition) {
@@ -289,7 +289,7 @@ trait CommonEngineFunctions
                     return $name;
                 }
 
-                if (($definition['type'] ?? null) === 'nested' && ($definition['properties']['vector']['type'] ?? null) === 'dense_vector') {
+                if (($definition['type'] ?? null) === 'nested' && data_get($definition, 'properties.vector.type') === 'dense_vector') {
                     return $name . '.vector';
                 }
             }

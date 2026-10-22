@@ -6,11 +6,11 @@ namespace Modules\Core\Search\Console;
 
 use Exception;
 use Illuminate\Support\Facades\Log;
+use Laravel\Scout\Console\QueueImportCommand as BaseQueueImportCommand;
 use Modules\Core\Cache\HasCache;
 use Modules\Core\Search\Traits\SearchableCommandUtils;
 use Override;
 use Symfony\Component\Console\Command\Command;
-use Laravel\Scout\Console\QueueImportCommand as BaseQueueImportCommand;
 
 final class QueueImportCommand extends BaseQueueImportCommand
 {
@@ -26,6 +26,7 @@ final class QueueImportCommand extends BaseQueueImportCommand
 
     #[Override]
     protected $description = 'Import the given model into the search index via chunked, queued jobs <fg=green>(⚡ Modules\Core)</fg=green>';
+
     public function handle(): int
     {
         try {
@@ -36,12 +37,14 @@ final class QueueImportCommand extends BaseQueueImportCommand
             }
 
             $this->input->setArgument('model', $model);
-            
+
             parent::handle();
 
             // If the model uses the HasCache trait, invalidate the cache
-            if (in_array(HasCache::class, class_uses_recursive($model), true)) {
-                new $model()->invalidateCache();
+            $instance = new $model();
+
+            if (in_array(HasCache::class, class_uses_recursive($instance), true) && method_exists($instance, 'invalidateCache')) {
+                $instance->invalidateCache();
                 $this->info('Cache has been invalidated for model ' . $model);
             }
 

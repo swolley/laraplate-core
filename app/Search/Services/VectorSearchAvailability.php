@@ -36,7 +36,9 @@ final class VectorSearchAvailability implements IVectorSearchAvailability
 
         $indexed = $this->indexedDimensions($model);
 
-        if ($indexed !== null && $indexed !== (int) config('core.search.vector.dimensions')) {
+        $configured = config('core.search.vector.dimensions');
+
+        if ($indexed !== null && $indexed !== (is_numeric($configured) ? (int) $configured : 0)) {
             return VectorAvailability::no('dimension_mismatch');
         }
 
@@ -51,7 +53,9 @@ final class VectorSearchAvailability implements IVectorSearchAvailability
         $keys = Cache::get(self::KEYS_KEY, []);
 
         foreach (is_array($keys) ? $keys : [] as $key) {
-            Cache::forget((string) $key);
+            if (is_string($key)) {
+                Cache::forget($key);
+            }
         }
 
         Cache::forget(self::KEYS_KEY);
