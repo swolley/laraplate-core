@@ -159,26 +159,20 @@ it('synchronizes the root from its locked snapshot while preserving intentional 
     );
 });
 
-it('invalidates relations loaded before locking and reloads their current state', function (): void {
+it('keeps the relations loaded before locking', function (): void {
     $article = VersionSetManagerArticle::query()->create(['title' => 'Root']);
     VersionSetManagerArticle::query()->create([
         'parent_id' => $article->getKey(),
         'title' => 'First child',
     ]);
-    $stale = $article->fresh()->load('children');
-    VersionSetManagerArticle::query()->create([
-        'parent_id' => $article->getKey(),
-        'title' => 'Second child',
-    ]);
-
-    expect($stale->relationLoaded('children'))->toBeTrue()
-        ->and($stale->children)->toHaveCount(1);
+    $loaded = $article->fresh()->load('children');
 
     app(VersionSetManagerInterface::class)->run(
-        VersionSetRoot::forModel($stale),
-        function () use ($stale): void {
-            expect($stale->relationLoaded('children'))->toBeFalse()
-                ->and($stale->children)->toHaveCount(2);
+        VersionSetRoot::forModel($loaded),
+        function () use ($loaded): void {
+            // What the caller loaded stays: the scope locks the row, it does not reload the aggregate (D34).
+            expect($loaded->relationLoaded('children'))->toBeTrue()
+                ->and($loaded->children)->toHaveCount(1);
         },
     );
 });

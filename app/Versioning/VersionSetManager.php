@@ -8,7 +8,9 @@ use Closure;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use LogicException;
+use Modules\Core\Contracts\IOptimisticLockableModel;
 use Modules\Core\Enums\VersionSetKind;
+use Modules\Core\Locking\Exceptions\StaleModelLockingException;
 use Modules\Core\Models\VersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Data\VersionSetOptions;
@@ -135,9 +137,21 @@ final class VersionSetManager implements VersionSetManagerInterface
             throw (new ModelNotFoundException)->setModel($model::class, [$model->getKey()]);
         }
 
+        // The version the instance carries is the one its caller read: a newer one on the locked row means the
+        // instance is stale, and refreshing it would let its save overwrite the other write (D34).
+        if ($model instanceof IOptimisticLockableModel && $model->currentLockVersion() !== null) {
+            $locked_version = $locked->getAttribute($model::lockVersionColumn());
+
+            throw_if(
+                is_numeric($locked_version) && (int) $locked_version !== $model->currentLockVersion(),
+                StaleModelLockingException::class,
+                'Model has been changed since it was loaded.',
+            );
+        }
+
+        // Realigned to the locked row, keeping what the caller changed and the relations it loaded (D34).
         $model->setRawAttributes($locked->getAttributes(), true);
         $model->setRawAttributes(array_replace($model->getAttributes(), $dirty_attributes));
-        $model->unsetRelations();
     }
 
     private function validateRevertedFrom(VersionSetRoot $root, VersionSetOptions $options): void
