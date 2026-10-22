@@ -27,7 +27,6 @@ use Modules\Core\Versioning\Exceptions\MultipleVersionConnectionsNotSupportedExc
 use Modules\Core\Versioning\Exceptions\PendingVersionSequenceException;
 use Modules\Core\Versioning\Exceptions\VersionSequenceMismatchException;
 use Modules\Core\Versioning\Exceptions\VersionSetOptionsMismatchException;
-use Modules\Core\Versioning\Exceptions\VersionSetRootMismatchException;
 
 beforeEach(function (): void {
     Schema::create(VersionSetManagerArticle::TABLE, function (Blueprint $table): void {
@@ -339,23 +338,25 @@ it('rejects differing explicit options in a nested scope before its operation ru
         ->and($manager->current())->toBeNull();
 });
 
-it('rejects a nested different root before its operation runs', function (): void {
+it('runs a nested different root in a set of its own (D43)', function (): void {
     $first = VersionSetManagerArticle::query()->create(['title' => 'First']);
     $second = VersionSetManagerArticle::query()->create(['title' => 'Second']);
     $manager = app(VersionSetManagerInterface::class);
     $nested_ran = false;
 
-    expect(fn () => $manager->run(
+    $manager->run(
         VersionSetRoot::forModel($first),
-        fn () => $manager->run(
-            VersionSetRoot::forModel($second),
-            function () use (&$nested_ran): void {
-                $nested_ran = true;
-            },
-        ),
-    ))->toThrow(VersionSetRootMismatchException::class);
+        function () use ($manager, $second, &$nested_ran): void {
+            $manager->run(
+                VersionSetRoot::forModel($second),
+                function (ActiveVersionSet $active) use (&$nested_ran, $second): void {
+                    $nested_ran = $second === $active->root()->model();
+                },
+            );
+        },
+    );
 
-    expect($nested_ran)->toBeFalse()
+    expect($nested_ran)->toBeTrue()
         ->and(VersionSet::query()->count())->toBe(0)
         ->and($manager->current())->toBeNull();
 });

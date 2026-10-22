@@ -44,7 +44,8 @@ final readonly class VersionWriter implements VersionWriterInterface
         }
 
         $this->manager->enlist($connection_name);
-        $active = $this->manager->current() ?? throw new LogicException('The version set scope was lost.');
+        // The set of the change's own root, never the set of the operation that caused it (D43).
+        $active = $this->manager->setFor($change->model);
 
         if ($change->type === VersionChangeType::Created && $change->relationPath === null && $change->model === $active->root()->model()) {
             $active->storeAsBaseline();

@@ -12,16 +12,12 @@ use Modules\Core\Versioning\Data\VersionSetRoot;
 use Modules\Core\Versioning\Exceptions\PendingVersionSequenceException;
 use Modules\Core\Versioning\Exceptions\VersionSequenceMismatchException;
 
+/**
+ * The version set of one root inside a scope of the version-set manager: its options, its row, written lazily on
+ * the first version, and the sequence of its rows. A scope holds one of these per root it touches (D43).
+ */
 final class ActiveVersionSet
 {
-    private ?VersionSetRoot $root = null;
-
-    private ?VersionSetOptions $options = null;
-
-    private ?string $connection_name = null;
-
-    private ?string $enlisted_connection_name = null;
-
     private ?VersionSet $version_set = null;
 
     /**
@@ -29,80 +25,31 @@ final class ActiveVersionSet
      */
     private ?VersionSetKind $stored_kind = null;
 
-    private int $depth = 0;
-
     private int $sequence = 0;
 
     private bool $sequence_allocated = false;
 
     private bool $version_written = false;
 
-    public function activate(
-        VersionSetRoot $root,
-        string $connection_name,
-        VersionSetOptions $options,
-    ): void {
-        if ($this->isActive()) {
-            throw new LogicException('A version set is already active in this scope.');
-        }
-
-        $this->root = $root;
-        $this->options = $options;
-        $this->connection_name = $connection_name;
-        $this->depth = 1;
-    }
-
-    public function isActive(): bool
-    {
-        return $this->root !== null;
-    }
+    public function __construct(
+        private readonly VersionSetRoot $root,
+        private readonly string $connection_name,
+        private readonly VersionSetOptions $options,
+    ) {}
 
     public function root(): VersionSetRoot
     {
-        return $this->root ?? throw new LogicException('No version set is active.');
+        return $this->root;
     }
 
     public function options(): VersionSetOptions
     {
-        return $this->options ?? throw new LogicException('No version set is active.');
+        return $this->options;
     }
 
     public function connectionName(): string
     {
-        return $this->connection_name ?? throw new LogicException('No version set is active.');
-    }
-
-    public function enlistedConnectionName(): ?string
-    {
-        return $this->enlisted_connection_name;
-    }
-
-    public function setEnlistedConnectionName(string $connection_name): void
-    {
-        $this->enlisted_connection_name = $connection_name;
-    }
-
-    public function enterNested(): void
-    {
-        if (! $this->isActive()) {
-            throw new LogicException('No version set is active.');
-        }
-
-        $this->depth++;
-    }
-
-    public function leaveNested(): void
-    {
-        if ($this->depth < 2) {
-            throw new LogicException('The outer version set scope cannot be left as nested.');
-        }
-
-        $this->depth--;
-    }
-
-    public function depth(): int
-    {
-        return $this->depth;
+        return $this->connection_name;
     }
 
     public function versionSet(): VersionSet
@@ -111,20 +58,18 @@ final class ActiveVersionSet
             return $this->version_set;
         }
 
-        $root = $this->root();
-        $options = $this->options();
         $version_set = new VersionSet;
-        $version_set->setConnection($this->connectionName());
+        $version_set->setConnection($this->connection_name);
         $version_set->forceFill([
             'uuid' => (string) str()->uuid(),
-            'root_type' => $root->type(),
-            'root_id' => $root->id(),
-            'root_connection_ref' => $root->connectionName(),
-            'root_table_ref' => $root->tableName(),
-            config('versionable.user_foreign_key', 'user_id') => $options->actorId(),
-            'kind' => $this->stored_kind ?? $options->kind,
-            'reason' => $options->reason,
-            'reverted_from_set_id' => $options->revertedFromId(),
+            'root_type' => $this->root->type(),
+            'root_id' => $this->root->id(),
+            'root_connection_ref' => $this->root->connectionName(),
+            'root_table_ref' => $this->root->tableName(),
+            config('versionable.user_foreign_key', 'user_id') => $this->options->actorId(),
+            'kind' => $this->stored_kind ?? $this->options->kind,
+            'reason' => $this->options->reason,
+            'reverted_from_set_id' => $this->options->revertedFromId(),
         ])->saveOrFail();
         $this->version_set = $version_set;
 
@@ -138,7 +83,7 @@ final class ActiveVersionSet
      */
     public function storeAsBaseline(): void
     {
-        if (! $this->version_set instanceof VersionSet && $this->options()->kind === VersionSetKind::Change) {
+        if (! $this->version_set instanceof VersionSet && $this->options->kind === VersionSetKind::Change) {
             $this->stored_kind = VersionSetKind::Baseline;
         }
     }
@@ -167,6 +112,10 @@ final class ActiveVersionSet
         $this->version_written = true;
     }
 
+    /**
+     * Checks the rows against the confirmed sequences, removes a set that received no row and stamps the root of a
+     * set whose root was saved during the scope.
+     */
     public function finish(): void
     {
         if ($this->sequence_allocated) {
@@ -196,32 +145,17 @@ final class ActiveVersionSet
             return;
         }
 
-        $root = $this->root();
-        $root_id = $root->id();
+        $root_id = $this->root->id();
 
         if ($root_id === null || $root_id === '') {
             throw new LogicException('A non-empty version set requires a persisted aggregate root.');
         }
 
         $this->version_set->forceFill([
-            'root_type' => $root->type(),
+            'root_type' => $this->root->type(),
             'root_id' => $root_id,
-            'root_connection_ref' => $root->connectionName(),
-            'root_table_ref' => $root->tableName(),
+            'root_connection_ref' => $this->root->connectionName(),
+            'root_table_ref' => $this->root->tableName(),
         ])->saveOrFail();
-    }
-
-    public function reset(): void
-    {
-        $this->root = null;
-        $this->options = null;
-        $this->connection_name = null;
-        $this->enlisted_connection_name = null;
-        $this->version_set = null;
-        $this->stored_kind = null;
-        $this->depth = 0;
-        $this->sequence = 0;
-        $this->sequence_allocated = false;
-        $this->version_written = false;
     }
 }

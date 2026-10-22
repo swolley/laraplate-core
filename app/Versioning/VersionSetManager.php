@@ -6,6 +6,7 @@ namespace Modules\Core\Versioning;
 
 use Closure;
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use LogicException;
 use Modules\Core\Contracts\IOptimisticLockableModel;
@@ -19,15 +20,16 @@ use Modules\Core\Versioning\Exceptions\DistinctVersionSetRootInstanceException;
 use Modules\Core\Versioning\Exceptions\InvalidRevertedVersionSetException;
 use Modules\Core\Versioning\Exceptions\MultipleVersionConnectionsNotSupportedException;
 use Modules\Core\Versioning\Exceptions\VersionSetOptionsMismatchException;
-use Modules\Core\Versioning\Exceptions\VersionSetRootMismatchException;
 use Override;
 
 final class VersionSetManager implements VersionSetManagerInterface
 {
-    public function __construct(
-        private readonly DatabaseManager $database,
-        private readonly ActiveVersionSet $active,
-    ) {}
+    /**
+     * The scope opened by the outermost run(), null outside one.
+     */
+    private ?VersionScope $scope = null;
+
+    public function __construct(private readonly DatabaseManager $database) {}
 
     #[Override]
     public function run(
@@ -35,88 +37,141 @@ final class VersionSetManager implements VersionSetManagerInterface
         Closure $operation,
         ?VersionSetOptions $options = null,
     ): mixed {
-        if ($this->active->isActive()) {
+        if ($this->scope instanceof VersionScope) {
             return $this->runNested($root, $operation, $options);
         }
 
         $connection = $root->model()->getConnection();
-        $connection_name = $connection->getName();
+        $connection_name = $root->connectionName();
         $resolved_options = $options ?? new VersionSetOptions;
-        $this->active->activate($root, $connection_name, $resolved_options);
+        $this->scope = new VersionScope($connection_name);
 
         try {
             $this->enlist($connection_name);
 
             return $connection->transaction(function () use ($root, $operation, $resolved_options): mixed {
-                $this->lockExistingRoot($root);
-                $this->validateRevertedFrom($root, $resolved_options);
-                $result = $operation($this->active);
+                $result = $this->runInSet($this->openSet($root, $resolved_options, lock: true), $operation);
                 $this->enlist($root->connectionName());
-                $this->active->finish();
+
+                foreach ($this->activeScope()->sets() as $set) {
+                    $set->finish();
+                }
 
                 return $result;
             });
         } finally {
-            $this->active->reset();
+            $this->scope = null;
         }
+    }
+
+    #[Override]
+    public function setFor(Model $root): ActiveVersionSet
+    {
+        $version_root = VersionSetRoot::forModel($root);
+        $existing = $this->activeScope()->find($version_root);
+
+        if ($existing instanceof ActiveVersionSet) {
+            return $existing;
+        }
+
+        $this->enlist($version_root->connectionName());
+
+        // Not locked here: the write that brings this root's change already ran in the scope's transaction and holds
+        // the row, and realigning the instance from inside its own model events would undo what they are doing.
+        return $this->openSet(
+            $version_root,
+            new VersionSetOptions(actor: $this->activeScope()->outermost()->options()->actorId()),
+            lock: false,
+        );
     }
 
     #[Override]
     public function enlist(string $connection): void
     {
-        if (! $this->active->isActive()) {
-            throw new LogicException('A database connection can only be enlisted inside a version set scope.');
-        }
-
-        $normalized = $this->database->connection($connection)->getName();
-        $enlisted = $this->active->enlistedConnectionName();
+        $scope = $this->activeScope();
+        $normalized = $this->database->connection($connection)->getName() ?? $connection;
+        $enlisted = $scope->enlistedConnectionName();
 
         if ($enlisted !== null && $enlisted !== $normalized) {
             throw MultipleVersionConnectionsNotSupportedException::forConnections($enlisted, $normalized);
         }
 
-        $this->active->setEnlistedConnectionName($normalized);
+        $scope->setEnlistedConnectionName($normalized);
     }
 
     #[Override]
     public function current(): ?ActiveVersionSet
     {
-        return $this->active->isActive() ? $this->active : null;
+        return $this->scope?->current();
     }
 
+    /**
+     * A run() inside a scope. The same root, on the same instance, joins its set; another root gets a set of its
+     * own in the same transaction, its row locked now, with the options given or the outer operation's actor (D43).
+     */
     private function runNested(
         VersionSetRoot $root,
         Closure $operation,
         ?VersionSetOptions $options,
     ): mixed {
-        $active_root = $this->active->root();
+        $scope = $this->activeScope();
+        $existing = $scope->find($root);
 
-        if (! $active_root->matches($root)) {
-            throw VersionSetRootMismatchException::between($active_root, $root);
-        }
+        if ($existing instanceof ActiveVersionSet) {
+            // Nested scopes share in-process model state, not only a database identity.
+            if ($existing->root()->model() !== $root->model()) {
+                throw new DistinctVersionSetRootInstanceException;
+            }
 
-        // Nested scopes share in-process model state, not only a database identity.
-        if ($active_root->model() !== $root->model()) {
-            throw new DistinctVersionSetRootInstanceException;
-        }
+            if ($options !== null && ! $existing->options()->semanticallyEquals($options)) {
+                throw new VersionSetOptionsMismatchException;
+            }
 
-        if ($options !== null && ! $this->active->options()->semanticallyEquals($options)) {
-            throw new VersionSetOptionsMismatchException;
+            $this->enlist($root->connectionName());
+
+            if ($options !== null) {
+                $this->validateRevertedFrom($root, $options);
+            }
+
+            return $this->runInSet($existing, $operation);
         }
 
         $this->enlist($root->connectionName());
 
-        if ($options !== null) {
-            $this->validateRevertedFrom($root, $options);
+        return $this->runInSet(
+            $this->openSet($root, $options ?? new VersionSetOptions(actor: $scope->outermost()->options()->actorId()), lock: true),
+            $operation,
+        );
+    }
+
+    private function openSet(VersionSetRoot $root, VersionSetOptions $options, bool $lock): ActiveVersionSet
+    {
+        if ($lock) {
+            $this->lockExistingRoot($root);
         }
 
-        $this->active->enterNested();
+        $this->validateRevertedFrom($root, $options);
+        $set = new ActiveVersionSet($root, $root->connectionName(), $options);
+        $this->activeScope()->add($set);
+
+        return $set;
+    }
+
+    private function runInSet(ActiveVersionSet $set, Closure $operation): mixed
+    {
+        $scope = $this->activeScope();
+        $scope->enter($set);
 
         try {
-            return $operation($this->active);
+            return $operation($set);
         } finally {
-            $this->active->leaveNested();
+            $scope->leave();
         }
+    }
+
+    private function activeScope(): VersionScope
+    {
+        return $this->scope ?? throw new LogicException('No version set scope is active.');
     }
 
     private function lockExistingRoot(VersionSetRoot $root): void
@@ -170,7 +225,7 @@ final class VersionSetManager implements VersionSetManagerInterface
             return;
         }
 
-        $connection_name = $this->active->connectionName();
+        $connection_name = $root->connectionName();
         $input_target = $options->revertedFrom;
 
         if ($input_target instanceof VersionSet) {

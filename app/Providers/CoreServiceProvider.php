@@ -122,7 +122,6 @@ use Modules\Core\Services\SettingsCacheCoordinator;
 use Modules\Core\Services\StubOutboxPublisher;
 use Modules\Core\SoftDeletes\SoftDeletes;
 use Modules\Core\Support\OwnerTimestamp;
-use Modules\Core\Versioning\ActiveVersionSet;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\VersionSetManager;
@@ -286,7 +285,6 @@ final class CoreServiceProvider extends ModuleServiceProvider
         // Read from `core.aggregate.*` each time an aggregate engine is built: the constructor holds the values only.
         $this->app->bind(AggregateLimits::class, static fn (): AggregateLimits => AggregateLimits::fromConfig());
 
-        $this->app->scoped(ActiveVersionSet::class);
         $this->app->scoped(VersionSetManagerInterface::class, VersionSetManager::class);
         $this->app->scoped(VersionWriterInterface::class, VersionWriter::class);
 
