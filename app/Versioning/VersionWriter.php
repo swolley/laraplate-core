@@ -6,6 +6,7 @@ namespace Modules\Core\Versioning;
 
 use Illuminate\Support\Facades\Date;
 use LogicException;
+use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\Models\Version;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
@@ -44,6 +45,11 @@ final readonly class VersionWriter implements VersionWriterInterface
 
         $this->manager->enlist($connection_name);
         $active = $this->manager->current() ?? throw new LogicException('The version set scope was lost.');
+
+        if ($change->type === VersionChangeType::Created && $change->relationPath === null && $change->model === $active->root()->model()) {
+            $active->storeAsBaseline();
+        }
+
         $version_set = $active->versionSet();
         $version_class = method_exists($change->model, 'getVersionModel')
             ? $change->model->getVersionModel()

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Core\Versioning;
 
 use LogicException;
+use Modules\Core\Enums\VersionSetKind;
 use Modules\Core\Models\VersionSet;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
@@ -22,6 +23,11 @@ final class ActiveVersionSet
     private ?string $enlisted_connection_name = null;
 
     private ?VersionSet $version_set = null;
+
+    /**
+     * The kind the set row is stored with when it differs from the scope's options (D53, D60).
+     */
+    private ?VersionSetKind $stored_kind = null;
 
     private int $depth = 0;
 
@@ -116,13 +122,25 @@ final class ActiveVersionSet
             'root_connection_ref' => $root->connectionName(),
             'root_table_ref' => $root->tableName(),
             config('versionable.user_foreign_key', 'user_id') => $options->actorId(),
-            'kind' => $options->kind,
+            'kind' => $this->stored_kind ?? $options->kind,
             'reason' => $options->reason,
             'reverted_from_set_id' => $options->revertedFromId(),
         ])->saveOrFail();
         $this->version_set = $version_set;
 
         return $version_set;
+    }
+
+    /**
+     * Stores the set as a baseline: its first row is the creation of its root, a complete anchor (D53). The
+     * scope's options keep their kind, so a nested run() with ordinary options still joins it (D60). Too late
+     * once the set row exists, and never for a revert.
+     */
+    public function storeAsBaseline(): void
+    {
+        if (! $this->version_set instanceof VersionSet && $this->options()->kind === VersionSetKind::Change) {
+            $this->stored_kind = VersionSetKind::Baseline;
+        }
     }
 
     public function nextSequence(): int
@@ -200,6 +218,7 @@ final class ActiveVersionSet
         $this->connection_name = null;
         $this->enlisted_connection_name = null;
         $this->version_set = null;
+        $this->stored_kind = null;
         $this->depth = 0;
         $this->sequence = 0;
         $this->sequence_allocated = false;
