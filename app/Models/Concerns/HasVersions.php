@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Foundation\Auth\User;
 use Illuminate\Support\Arr;
+use Modules\Core\Contracts\ILockableModel;
 use Modules\Core\Contracts\IOptimisticLockableModel;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Enums\VersionChangeType;
@@ -202,7 +203,7 @@ trait HasVersions
     }
 
     /**
-     * The optimistic locking column is concurrency plumbing, not model state.
+     * The optimistic locking column is concurrency plumbing, not model state, and so are the lock columns.
      * Leaving it in a SNAPSHOT image would make a restore write back a stale
      * token, and every later update on that record would fail as if another
      * user had touched it.
@@ -219,6 +220,12 @@ trait HasVersions
         // user again.
         if ($this instanceof IOptimisticLockableModel) {
             $columns[] = $this::lockVersionColumn();
+        }
+
+        // The lock columns are coordination state, written without events: in a snapshot they would let a
+        // revert bring back a stale lock or drop a live one (D21).
+        if ($this instanceof ILockableModel) {
+            array_push($columns, $this->getLockedAtColumn(), $this->getLockedByColumn(), $this->getLockedUntilColumn());
         }
 
         return array_values(array_unique($columns));
