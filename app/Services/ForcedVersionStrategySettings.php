@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Concerns\HasVersions;
+use Modules\Core\Versioning\NeverVersionedModels;
 use ReflectionClass;
 
 final class ForcedVersionStrategySettings
@@ -33,6 +34,15 @@ final class ForcedVersionStrategySettings
                 continue;
             }
             $reflection = new ReflectionClass($model_class);
+
+            // Never versioned (D8, D10): a row left from an older seed is hidden and refused like a forced one.
+            if (NeverVersionedModels::includes($model_class) && ! $reflection->isAbstract()) {
+                /** @var Model $model */
+                $model = $reflection->newInstanceWithoutConstructor();
+                $names[] = PerModelSettingResolver::nameFor(CoreDatabaseSeeder::VERSIONING_NAME_PREFIX, $model->getTable());
+
+                continue;
+            }
 
             if (! $reflection->hasProperty('versionStrategy')) {
                 continue;

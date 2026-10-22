@@ -16,6 +16,7 @@ use Modules\Core\Models\Concerns\HasTranslations;
 use Modules\Core\Models\Concerns\HasVersions;
 use Modules\Core\Models\DynamicEntity;
 use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Versioning\NeverVersionedModels;
 use ReflectionClass;
 use Throwable;
 
@@ -52,7 +53,7 @@ final class ModelCapabilityScanner
             $scanned[] = new ModelCapabilities(
                 modelClass: $model_class,
                 table: $table,
-                hasVersions: isset($traits[HasVersions::class]),
+                hasVersions: isset($traits[HasVersions::class]) && ! NeverVersionedModels::includes($model_class),
                 hasSoftDeletes: isset($traits[SoftDeletes::class]),
                 hasLocks: isset($traits[HasLocks::class]),
                 hasOptimisticLocking: isset($traits[HasOptimisticLocking::class]),

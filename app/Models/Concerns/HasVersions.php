@@ -29,6 +29,7 @@ use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
 use Modules\Core\Versioning\Data\VersionSetOptions;
 use Modules\Core\Versioning\Data\VersionSetRoot;
+use Modules\Core\Versioning\NeverVersionedModels;
 
 // use Illuminate\Database\Eloquent\Relations\Pivot;
 // use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -415,6 +416,10 @@ trait HasVersions
 
     public function getVersionStrategy(): VersionStrategy|false
     {
+        if (NeverVersionedModels::includes(static::class)) {
+            return false;
+        }
+
         if (property_exists($this, 'versionStrategy')) {
             $configured = $this->versionStrategy;
 
