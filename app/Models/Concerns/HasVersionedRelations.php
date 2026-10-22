@@ -329,7 +329,7 @@ trait HasVersionedRelations
             ->orderByDesc('sequence')
             ->first();
 
-        $version?->revert();
+        $version?->setRelation('versionable', $this)->revert();
     }
 
     private function referenceSubjectExists(string $relation, int|string $subjectId): bool

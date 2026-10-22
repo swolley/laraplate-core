@@ -116,6 +116,16 @@ it('revertWithoutSaving applies diff strategy using previous versions and curren
     $user->exists = true;
     $user->setRawAttributes(array_merge($base_user->getAttributes(), ['deleted_at' => null]), true);
 
+    // The creation snapshot every history starts from: a chain of diffs is replayed from it (C08).
+    $v0 = new Version([
+        'versionable_id' => $user->getKey(),
+        'versionable_type' => $user->getMorphClass(),
+        'version_strategy' => VersionStrategy::SNAPSHOT,
+        'contents' => ['name' => 'Live'],
+    ]);
+    $v0->created_at = now()->subMinutes(10);
+    persistVersionModelFixture($v0);
+
     $v1 = new Version([
         'versionable_id' => $user->getKey(),
         'versionable_type' => $user->getMorphClass(),

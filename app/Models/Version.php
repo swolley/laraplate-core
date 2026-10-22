@@ -21,10 +21,28 @@ use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Concerns\HasDynamicContents;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
+use Modules\Core\Versioning\Exceptions\MissingVersionAnchorException;
 use Override;
 
 /**
  * One row of the history of a versioned record.
+ *
+ * @property int|string $id
+ * @property int|null $version_set_id
+ * @property int|null $sequence
+ * @property VersionChangeType $change_type
+ * @property string|null $relation_path
+ * @property mixed $subject_key
+ * @property string $versionable_type
+ * @property int|string $versionable_id
+ * @property int|null $user_id
+ * @property array<string, mixed>|null $original_contents
+ * @property array<string, mixed>|null $contents
+ * @property VersionStrategy|null $version_strategy
+ * @property string|null $connection_ref
+ * @property string|null $table_ref
+ * @property \Carbon\CarbonImmutable|null $created_at
+ * @property \Carbon\CarbonImmutable|null $compacted_at
  *
  * Derived from overtrue/laravel-versionable (MIT), see LICENSES/laravel-versionable.md: the relation to the
  * versioned record, the ordering scopes, revert() and the uuid key were the package's.
@@ -180,6 +198,13 @@ final class Version extends Model
         return VersionStrategy::DIFF;
     }
 
+    /**
+     * The record with its versionable columns set to their state as of this row ({@see stateAsOf()}), not saved.
+     * The deleted-at column keeps its live value: a revert never moves the record into or out of the bin, which
+     * is the bin's own operation (D20, D61).
+     *
+     * @throws MissingVersionAnchorException
+     */
     public function revertWithoutSaving(): ?Model
     {
         $versionable = $this->getCompleteVersionable();
@@ -188,34 +213,53 @@ final class Version extends Model
             return null;
         }
 
-        $original = $versionable->getRawOriginal();
+        $state = $this->stateAsOf();
 
-        switch ($this->resolveReplayVersionStrategy($versionable)) {
-            case VersionStrategy::DIFF:
-                // v1 + ... + vN
-                /** @var self $version */
-                foreach ($this->previousVersions()->orderOldestFirst()->get() as $version) {
-                    if ($version->contents !== []) {
-                        $versionable->setRawAttributes(array_merge($original, $version->contents));
-                    }
-                }
-
-                break;
-            case VersionStrategy::SNAPSHOT:
-                // v1 + vN
-                /** @var self $initVersion */
-                $initVersion = $versionable->versions()->first();
-
-                if ($initVersion->contents !== []) {
-                    $versionable->setRawAttributes(array_merge($original, $initVersion->contents));
-                }
+        if (method_exists($versionable, 'getDeletedAtColumn')) {
+            unset($state[$versionable->getDeletedAtColumn()]);
         }
 
-        if ($this->contents !== []) {
-            $versionable->setRawAttributes(array_merge($original, $this->contents));
-        }
+        $versionable->setRawAttributes(array_merge($versionable->getRawOriginal(), $state));
 
         return $versionable;
+    }
+
+    /**
+     * The versionable columns of the record as of this row: the nearest snapshot of the record at or before it,
+     * then every later row up to this one applied forward in revision order, last write wins (C08). The strategy
+     * stored on each row decides, never the model's current one. Only the record's own rows count, not those of
+     * its translations or relations; a hard-delete tombstone is not a state of a live record.
+     *
+     *
+     * @throws MissingVersionAnchorException
+     *
+     * @return array<string, mixed>
+     */
+    public function stateAsOf(): array
+    {
+        $anchor = $this->ownRowsUpToThis()
+            ->where('version_strategy', VersionStrategy::SNAPSHOT)
+            ->where('change_type', '!=', VersionChangeType::Deleted)
+            ->orderByDesc('version_set_id')
+            ->orderByDesc('sequence')
+            ->first() ?? throw new MissingVersionAnchorException($this->id);
+
+        $state = $anchor->contents ?? [];
+        $later = $this->ownRowsUpToThis()
+            ->where(static fn (Builder $query): Builder => $query
+                ->where('version_set_id', '>', $anchor->version_set_id)
+                ->orWhere(static fn (Builder $same_set): Builder => $same_set
+                    ->where('version_set_id', $anchor->version_set_id)
+                    ->where('sequence', '>', $anchor->sequence)))
+            ->orderBy('version_set_id')
+            ->orderBy('sequence')
+            ->get();
+
+        foreach ($later as $row) {
+            $state = array_merge($state, $row->contents ?? []);
+        }
+
+        return $state;
     }
 
     /**
@@ -354,6 +398,25 @@ final class Version extends Model
         }
 
         return array_values(array_filter($masked, is_string(...)));
+    }
+
+    /**
+     * The rows of this record's own stream (no `relation_path`) up to this row, in revision order: earlier sets,
+     * then the earlier or equal sequences of this set. Without the eager `versionable`.
+     *
+     * @return Builder<self>
+     */
+    private function ownRowsUpToThis(): Builder
+    {
+        return $this->newQueryWithoutRelationships()
+            ->where('versionable_type', $this->getAttribute('versionable_type'))
+            ->where('versionable_id', $this->getAttribute('versionable_id'))
+            ->whereNull('relation_path')
+            ->where(fn (Builder $query): Builder => $query
+                ->where('version_set_id', '<', $this->getAttribute('version_set_id'))
+                ->orWhere(fn (Builder $same_set): Builder => $same_set
+                    ->where('version_set_id', $this->getAttribute('version_set_id'))
+                    ->where('sequence', '<=', $this->getAttribute('sequence'))));
     }
 
     private function getCompleteVersionable(): ?Model

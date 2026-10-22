@@ -456,6 +456,9 @@ trait HasVersions
     public function revertToVersion(int|string $id): bool
     {
         $version = $this->versions()->whereKey($id)->firstOrFail();
+        // The record reverted is this one: the relation would not find a record in the bin, and the set locks
+        // this instance.
+        $version->setRelation('versionable', $this);
 
         return (bool) app(VersionSetManagerInterface::class)->run(
             VersionSetRoot::forModel($this),
