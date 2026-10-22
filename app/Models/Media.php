@@ -42,6 +42,8 @@ use Throwable;
  * seam (M4a), so Core never references the AI module.
  *
  * @phpstan-use Searchable<Media>
+ *
+ * @implements IAuthorizesSearchRehydration<Media>
  */
 #[ObservedBy([MediaMetadataObserver::class, MediaLifecycleObserver::class])]
 final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEmbeddableModel, IRestrictsReadableColumns, ISearchableModel, ISoftDeletableModel
@@ -96,10 +98,14 @@ final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEm
         $visible = [];
 
         foreach ($owner_types as $owner_type) {
-            $owners = self::visibleOwnersOf((string) $owner_type);
+            if (! is_string($owner_type)) {
+                continue;
+            }
+
+            $owners = self::visibleOwnersOf($owner_type);
 
             if ($owners instanceof Builder) {
-                $visible[(string) $owner_type] = $owners;
+                $visible[$owner_type] = $owners;
             }
         }
 
@@ -141,13 +147,13 @@ final class Media extends BaseMedia implements IAuthorizesSearchRehydration, IEm
     public function reindexOwner(): void
     {
         // An owner whose module was disabled or removed cannot be resolved; nothing to reindex.
-        if (! is_string($this->model_type) || ! class_exists($this->model_type)) {
+        if (! class_exists($this->model_type)) {
             return;
         }
 
         $owner = $this->model;
 
-        if ($owner instanceof ISearchableModel && $owner instanceof Model && $owner->shouldBeSearchable()) {
+        if ($owner instanceof ISearchableModel && $owner->shouldBeSearchable()) {
             $owner->searchable();
         }
     }

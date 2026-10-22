@@ -10,12 +10,14 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * A searchable model whose hits need an authorization the index cannot hold,
  * applied when search hits are turned back into models.
+ *
+ * @template TModel of Model
  */
 interface IAuthorizesSearchRehydration
 {
     /**
-     * @param  Builder<Model>  $query  the rehydration query, already restricted to the hit ids
-     * @return Builder<Model>
+     * @param  Builder<TModel>  $query  the rehydration query, already restricted to the hit ids
+     * @return Builder<TModel>
      */
     public function authorizeSearchRehydration(Builder $query): Builder;
 }
