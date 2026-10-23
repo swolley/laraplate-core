@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use Modules\Core\Search\Support\PgvectorProfileIndex;
 
-const PGV_KEY = 'sentence_transformers:all-MiniLM-L6-v2';
+const PGV_KEY = 'openai_compatible:all-MiniLM-L6-v2';
 
 it('builds a partial hnsw expression index on the cast column', function (): void {
     $statements = PgvectorProfileIndex::statements('core_model_embeddings', PGV_KEY, 384, 'cosine');

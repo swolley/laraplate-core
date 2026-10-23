@@ -87,7 +87,7 @@ key in a module's row).
 
 Core seeds four managed settings in group `search`, written by the AI embedding model switch:
 `search.vector.dimensions` (384), `search.vector.similarity` (`cosine`), `search.vector.model`
-(`sentence_transformers:intfloat/multilingual-e5-small`) and `search.vector.suspended_reason` (null).
+(`openai_compatible:intfloat/multilingual-e5-small`) and `search.vector.suspended_reason` (null).
 
 ## Change confirmations and locks
 

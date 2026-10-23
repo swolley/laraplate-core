@@ -115,7 +115,7 @@ final class CoreDatabaseSeeder extends Seeder implements DeclaresSeedDependencie
             self::setting('search.vector.enabled', false, SettingTypeEnum::Boolean, 'search', 'Enable vector search'),
             self::setting('search.vector.dimensions', 384, SettingTypeEnum::Integer, 'search', 'Vector search dimensions (set by the embedding model switch)', managed: true),
             self::setting('search.vector.similarity', 'cosine', SettingTypeEnum::String, 'search', 'Vector similarity metric (set by the embedding model switch)', ['cosine', 'dot_product', 'euclidean'], managed: true),
-            self::setting('search.vector.model', 'sentence_transformers:intfloat/multilingual-e5-small', SettingTypeEnum::String, 'search', 'Active embedding model, as provider:model (set by the embedding model switch)', managed: true),
+            self::setting('search.vector.model', 'openai_compatible:intfloat/multilingual-e5-small', SettingTypeEnum::String, 'search', 'Active embedding model, as provider:model (set by the embedding model switch)', managed: true),
             self::setting('search.vector.suspended_reason', null, SettingTypeEnum::String, 'search', 'Why vector search is suspended, null when it is not (set by the embedding model switch)', managed: true),
             self::setting('search.adaptive_tuning', false, SettingTypeEnum::Boolean, 'search', 'Apply the committed retrieval tuning profile (config/search_tuning.php) per query class; off keeps the fixed planner values'),
             self::setting('search.max_retries', 2, SettingTypeEnum::Integer, 'search', 'Most times a search request may ask to search again after a poor result (the retry parameter is clamped to this)'),
