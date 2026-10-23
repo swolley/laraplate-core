@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\Core\Models\Concerns;
 
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Modules\Core\Contracts\IsPartOfParent;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionStrategy;
+use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
 use Modules\Core\Versioning\Data\VersionChange;
+use Modules\Core\Versioning\Data\VersionSetOptions;
+use Modules\Core\Versioning\Data\VersionSetRoot;
 
 /**
  * A part of a versioned record that has no history of its own: its changes are rows of its owner's history (D10).
@@ -57,6 +61,25 @@ trait RecordsChangesOnOwner
         static::deleted(static function (Model $part): void {
             $part->recordOnOwner(VersionChangeType::Deleted);
         });
+    }
+
+    /**
+     * Saves the part inside its owner's revision scope when no scope is open, so the part and the row it records on
+     * its owner commit together (D52); inside an open scope the row joins its owner's set as it is.
+     *
+     * @param  array<string, mixed>  $options
+     */
+    public function save(array $options = []): bool
+    {
+        return (bool) $this->withinOwnerScope(fn (): bool => parent::save($options));
+    }
+
+    /**
+     * Deletes the part inside its owner's revision scope when no scope is open, as {@see self::save()}.
+     */
+    public function delete(): ?bool
+    {
+        return $this->withinOwnerScope(fn (): ?bool => parent::delete());
     }
 
     /**
@@ -127,6 +150,28 @@ trait RecordsChangesOnOwner
         }
 
         return $owner->getVersionStrategy() === false ? null : $owner;
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $operation
+     * @return TResult
+     */
+    private function withinOwnerScope(Closure $operation): mixed
+    {
+        $manager = app(VersionSetManagerInterface::class);
+        $owner = $manager->current() === null ? $this->versionedOwner() : null;
+
+        if (! $owner instanceof Model || ! $owner->exists) {
+            return $operation();
+        }
+
+        return $manager->run(
+            VersionSetRoot::forModel($owner),
+            $operation,
+            new VersionSetOptions(actor: $owner->getVersionUserId()),
+        );
     }
 
     private function parentOwner(): ?Model

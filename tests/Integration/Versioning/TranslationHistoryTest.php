@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\Core\Enums\VersionCaptureQuality;
 use Modules\Core\Enums\VersionChangeType;
 use Modules\Core\Enums\VersionStrategy;
 use Modules\Core\Models\Version;
+use Modules\Core\Models\VersionSet;
 use Modules\Core\Tests\Stubs\Versioning\TranslatedDocument;
 use Modules\Core\Tests\Stubs\Versioning\TranslatedDocumentTranslation;
 
@@ -111,4 +113,36 @@ it('writes no row on the translation itself', function (): void {
     $this->document->setTranslation('it', ['title' => 'Titolo']);
 
     expect(Version::query()->where('versionable_type', (new TranslatedDocumentTranslation)->getMorphClass())->count())->toBe(0);
+});
+
+it('writes a translation saved on its own in one atomic set of its owner', function (): void {
+    $before = VersionSet::query()->max('id');
+
+    $this->document->setTranslation('it', ['title' => 'Titolo', 'body' => 'Testo']);
+
+    $set = VersionSet::query()->where('id', '>', $before)->sole();
+
+    expect($set->capture)->toBe(VersionCaptureQuality::Atomic)
+        ->and($set->root_id)->toBe((string) $this->document->getKey())
+        ->and($set->versions()->pluck('relation_path')->all())->toBe(['translations']);
+});
+
+it('joins the owner scope when the translation is written inside it', function (): void {
+    $before = VersionSet::query()->max('id');
+
+    $this->document->withinRevision(function (): void {
+        $this->document->setTranslation('it', ['title' => 'Titolo']);
+        $this->document->setTranslation('de', ['title' => 'Titel']);
+    });
+
+    expect(VersionSet::query()->where('id', '>', $before)->count())->toBe(1);
+});
+
+it('opens the owner scope for a translation deleted on its own', function (): void {
+    $this->document->setTranslation('it', ['title' => 'Titolo']);
+    $before = VersionSet::query()->max('id');
+
+    $this->document->translations()->where('locale', 'it')->firstOrFail()->delete();
+
+    expect(VersionSet::query()->where('id', '>', $before)->sole()->capture)->toBe(VersionCaptureQuality::Atomic);
 });
