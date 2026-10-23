@@ -58,6 +58,7 @@ use Modules\Core\Console\PruneMediaDraftsCommand;
 use Modules\Core\Console\WarmCacheCommand;
 use Modules\Core\Contracts\BootSampler;
 use Modules\Core\Contracts\OutboxPublisher;
+use Modules\Core\Contracts\RefreshesConfigCache;
 use Modules\Core\Exceptions\ConfigurationException;
 use Modules\Core\Filament\Generators\LaraplateResourceClassGenerator;
 use Modules\Core\Filament\Generators\LaraplateResourceCreateRecordPageClassGenerator;
@@ -121,6 +122,7 @@ use Modules\Core\Services\SettingChangeConfirmations;
 use Modules\Core\Services\SettingsCacheCoordinator;
 use Modules\Core\Services\StubOutboxPublisher;
 use Modules\Core\SoftDeletes\SoftDeletes;
+use Modules\Core\Support\Env\ConfigCacheRefresher;
 use Modules\Core\Support\OwnerTimestamp;
 use Modules\Core\Versioning\Contracts\VersionSetManagerInterface;
 use Modules\Core\Versioning\Contracts\VersionWriterInterface;
@@ -275,6 +277,7 @@ final class CoreServiceProvider extends ModuleServiceProvider
 
         $this->app->singleton(GraphProviderRegistryInterface::class, GraphProviderRegistry::class);
         $this->app->bind(GraphToolGatewayInterface::class, GraphToolGateway::class);
+        $this->app->bind(RefreshesConfigCache::class, ConfigCacheRefresher::class);
         $this->app->singleton(
             ApplicationContentRetrievalProviderRegistryInterface::class,
             ApplicationContentRetrievalProviderRegistry::class,
