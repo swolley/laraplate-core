@@ -10,9 +10,9 @@ namespace Modules\Core\Support\Env;
 final readonly class EnvValue
 {
     /**
-     * The characters Dotenv reads literally when a value is not quoted.
+     * The characters Dotenv reads literally when a value is not quoted; an empty value is written bare too (`NAME=`).
      */
-    private const string BARE_PATTERN = '/^[A-Za-z0-9_.:\/@%+,-]+$/';
+    private const string BARE_PATTERN = '/^[A-Za-z0-9_.:\/@%+,-]*$/';
 
     /**
      * The last underscore-separated word of a name that marks it as holding a secret.
@@ -22,7 +22,7 @@ final readonly class EnvValue
     private const array SECRET_WORDS = ['KEY', 'SECRET', 'PASSWORD', 'PASS', 'TOKEN', 'CREDENTIAL'];
 
     /**
-     * The text to put after `NAME=`: the value itself when Dotenv reads it literally, otherwise wrapped in
+     * The text to put after `NAME=`: the value itself when Dotenv reads it literally (an empty value included), otherwise wrapped in
      * double quotes with the backslash, the double quote and the dollar escaped and line breaks written as `\n`.
      */
     public static function format(string $value): string

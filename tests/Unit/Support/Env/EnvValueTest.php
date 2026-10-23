@@ -7,7 +7,7 @@ use Modules\Core\Support\Env\EnvValue;
 
 it('writes a plain value bare', function (string $value): void {
     expect(EnvValue::format($value))->toBe($value);
-})->with(['abc', 'http://localhost:8080', '1.5', 'a-b_c', 'user@host', '10,20']);
+})->with(['abc', 'http://localhost:8080', '1.5', 'a-b_c', 'user@host', '10,20', '']);
 
 it('round-trips through Dotenv::parse', function (string $value): void {
     $parsed = Dotenv::parse('NAME=' . EnvValue::format($value));
@@ -33,7 +33,7 @@ it('round-trips through Dotenv::parse', function (string $value): void {
 
 it('quotes what Dotenv would read differently', function (string $value): void {
     expect(EnvValue::format($value))->toStartWith('"')->toEndWith('"');
-})->with(['', 'two words', '#x', 'say "hi"', '$HOME', "a\nb"]);
+})->with(['two words', '#x', 'say "hi"', '$HOME', "a\nb"]);
 
 it('detects secret names', function (string $name, bool $secret): void {
     expect(EnvValue::isSecretName($name))->toBe($secret);
