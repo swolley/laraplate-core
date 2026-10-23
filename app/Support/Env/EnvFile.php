@@ -17,7 +17,13 @@ final class EnvFile
 {
     private const string NAME_PATTERN = '/^[A-Z][A-Z0-9_]*$/';
 
-    private const string ENTRY_PATTERN = '/^\s*(#\s*)?([A-Z][A-Z0-9_]*)=(.*)$/';
+    private const string ACTIVE_PATTERN = '/^\s*(?:export\s+)?([A-Z][A-Z0-9_]*)=(.*)$/';
+
+    /**
+     * A commented variable is `# NAME=` followed by a quoted text or one token; anything longer is prose that
+     * happens to start like one (`# SAO_SYNC_ENABLED=false to keep the command manual-only.`).
+     */
+    private const string COMMENTED_PATTERN = '/^\s*#\s*([A-Z][A-Z0-9_]*)=("[^"]*"|\'[^\']*\'|\S*)\s*$/';
 
     private function __construct(
         private readonly string $path,
@@ -48,8 +54,16 @@ final class EnvFile
         $comment = [];
 
         foreach (preg_split('/\r\n|\n|\r/', $this->content) ?: [] as $line) {
-            if (preg_match(self::ENTRY_PATTERN, $line, $match) === 1) {
-                $entries[] = new EnvEntry($match[2], self::unquote(mb_trim($match[3])), $match[1] !== '', implode(' ', $comment));
+            if (preg_match(self::ACTIVE_PATTERN, $line, $match) === 1) {
+                $raw = mb_trim($match[2]);
+                $entries[] = new EnvEntry($match[1], self::unquote($raw), $raw, false, implode(' ', $comment));
+                $comment = [];
+
+                continue;
+            }
+
+            if (preg_match(self::COMMENTED_PATTERN, $line, $match) === 1) {
+                $entries[] = new EnvEntry($match[1], self::unquote($match[2]), $match[2], true, implode(' ', $comment));
                 $comment = [];
 
                 continue;
@@ -76,11 +90,7 @@ final class EnvFile
      */
     public function definedNames(): array
     {
-        try {
-            return array_map(strval(...), array_keys(Dotenv::parse($this->content)));
-        } catch (InvalidFileException) {
-            throw new RuntimeException("The file {$this->path} is not valid dotenv syntax.");
-        }
+        return $this->namesDefinedIn($this->content);
     }
 
     public function entry(string $name): ?EnvEntry
@@ -122,43 +132,27 @@ final class EnvFile
     }
 
     /**
-     * Appends `NAME=value` and nothing else changes: the new content goes to a temporary file in the same
-     * directory, takes the mode of the original and replaces it, so a crash never leaves a truncated file.
+     * Appends `NAME=value`, the value quoted when Dotenv would read it differently. Nothing else of the file
+     * changes: see {@see self::write()}.
      *
      * @throws InvalidArgumentException when the name is not NAME-shaped or is already defined
      * @throws RuntimeException when the file or its directory cannot be written
      */
     public function append(string $name, string $value): void
     {
-        throw_if(preg_match(self::NAME_PATTERN, $name) !== 1, InvalidArgumentException::class, 'A variable name is upper case letters, digits and underscores, and starts with a letter.');
-        throw_if(in_array($name, $this->definedNames(), true), InvalidArgumentException::class, "{$name} is already defined in the file.");
+        $this->write($name, EnvValue::format($value));
+    }
 
-        $directory = dirname($this->path);
-
-        throw_unless(is_writable($this->path) && is_writable($directory), RuntimeException::class, "The file {$this->path} cannot be written.");
-
-        $eol = str_contains($this->content, "\r\n") ? "\r\n" : "\n";
-        $content = $this->content;
-
-        if ($content !== '' && ! str_ends_with($content, "\n") && ! str_ends_with($content, "\r")) {
-            $content .= $eol;
-        }
-
-        $content .= $name . '=' . EnvValue::format($value) . $eol;
-
-        $temporary = tempnam($directory, '.env.');
-
-        throw_if($temporary === false, RuntimeException::class, "The file {$this->path} cannot be written.");
-
-        $mode = fileperms($this->path);
-
-        if (file_put_contents($temporary, $content) === false || ! chmod($temporary, $mode === false ? 0o600 : $mode & 0o777) || ! rename($temporary, $this->path)) {
-            @unlink($temporary);
-
-            throw new RuntimeException("The file {$this->path} cannot be written.");
-        }
-
-        $this->content = $content;
+    /**
+     * Appends `NAME=` followed by `$text` exactly as given (an example's `"${APP_NAME}"` keeps its quotes and its
+     * reference), where {@see self::append()} would escape the `$`.
+     *
+     * @throws InvalidArgumentException when the name is not NAME-shaped or is already defined
+     * @throws RuntimeException when the file or its directory cannot be written
+     */
+    public function appendRaw(string $name, string $text): void
+    {
+        $this->write($name, $text);
     }
 
     private static function unquote(string $value): string
@@ -168,5 +162,93 @@ final class EnvFile
         }
 
         return $value;
+    }
+
+    /**
+     * The one write: it works on what the file holds now, not on what it held when it was read, so an edit made
+     * meanwhile is kept; it follows a symlink to the file it points to; the new content goes to a temporary file in
+     * the same directory, which takes the mode (and, for a superuser, the owner and group) of the original and
+     * replaces it, so a crash never leaves a truncated file. Every filesystem call is checked, not left to raise
+     * a PHP warning: a warning would escape as an exception whose trace holds the value.
+     *
+     * @throws InvalidArgumentException
+     * @throws RuntimeException
+     */
+    private function write(string $name, string $text): void
+    {
+        throw_if(preg_match(self::NAME_PATTERN, $name) !== 1, InvalidArgumentException::class, 'A variable name is upper case letters, digits and underscores, and starts with a letter.');
+
+        $target = realpath($this->path) ?: $this->path;
+        $directory = dirname($target);
+
+        throw_unless(is_file($target) && is_writable($target) && is_writable($directory), RuntimeException::class, "The file {$this->path} cannot be written.");
+
+        $current = @file_get_contents($target);
+
+        throw_if($current === false, RuntimeException::class, "The file {$this->path} cannot be read.");
+        throw_if(in_array($name, $this->namesDefinedIn($current), true), InvalidArgumentException::class, "{$name} is already defined in the file.");
+
+        $eol = str_contains($current, "\r\n") ? "\r\n" : "\n";
+        $content = $current;
+
+        if ($content !== '' && ! str_ends_with($content, "\n") && ! str_ends_with($content, "\r")) {
+            $content .= $eol;
+        }
+
+        $content .= $name . '=' . $text . $eol;
+
+        $temporary = @tempnam($directory, '.env.');
+
+        throw_if($temporary === false, RuntimeException::class, "The file {$this->path} cannot be written.");
+
+        $mode = @fileperms($target);
+        $written = @file_put_contents($temporary, $content) === mb_strlen($content)
+            && @chmod($temporary, $mode === false ? 0o600 : $mode & 0o777)
+            && $this->keepOwner($temporary, $target)
+            && @rename($temporary, $target);
+
+        if (! $written) {
+            @unlink($temporary);
+
+            throw new RuntimeException("The file {$this->path} cannot be written.");
+        }
+
+        $this->content = $content;
+    }
+
+    /**
+     * Gives the temporary file the owner and group of the file it replaces, which only a superuser may do: a
+     * `sudo php artisan env:fill` must not hand a www-data `.env` to root. Not being able to is not a failure.
+     */
+    private function keepOwner(string $temporary, string $target): bool
+    {
+        if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+            $owner = @fileowner($target);
+            $group = @filegroup($target);
+
+            if ($owner !== false) {
+                @chown($temporary, $owner);
+            }
+
+            if ($group !== false) {
+                @chgrp($temporary, $group);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @throws RuntimeException when the content is not valid dotenv syntax; the message never carries a value
+     *
+     * @return list<string>
+     */
+    private function namesDefinedIn(string $content): array
+    {
+        try {
+            return array_map(strval(...), array_keys(Dotenv::parse($content)));
+        } catch (InvalidFileException) {
+            throw new RuntimeException("The file {$this->path} is not valid dotenv syntax.");
+        }
     }
 }

@@ -50,11 +50,11 @@ it('reads active, commented, quoted and empty entries and the comment block abov
     $entries = EnvFile::read($path)->entries();
 
     expect($entries)->toHaveCount(5)
-        ->and($entries[0])->toEqual(new EnvEntry('APP_NAME', 'Laraplate', false, ''))
-        ->and($entries[1])->toEqual(new EnvEntry('AI_TIMEOUT', '30', false, 'Seconds an embedding request may take. Raise it on a slow CPU.'))
-        ->and($entries[2])->toEqual(new EnvEntry('AI_BATCH', '32', true, ''))
-        ->and($entries[3])->toEqual(new EnvEntry('EMPTY', '', false, ''))
-        ->and($entries[4])->toEqual(new EnvEntry('QUOTED', 'single quoted', false, ''));
+        ->and($entries[0])->toEqual(new EnvEntry('APP_NAME', 'Laraplate', '"Laraplate"', false, ''))
+        ->and($entries[1])->toEqual(new EnvEntry('AI_TIMEOUT', '30', '30', false, 'Seconds an embedding request may take. Raise it on a slow CPU.'))
+        ->and($entries[2])->toEqual(new EnvEntry('AI_BATCH', '32', '32', true, ''))
+        ->and($entries[3])->toEqual(new EnvEntry('EMPTY', '', '', false, ''))
+        ->and($entries[4])->toEqual(new EnvEntry('QUOTED', 'single quoted', "'single quoted'", false, ''));
 });
 
 it('ignores prose comments that are not NAME= lines', function (): void {
@@ -179,4 +179,82 @@ it('wraps a parse error without the value', function (): void {
         expect($exception->getMessage())->not->toContain('top secret')
             ->and($exception->getPrevious())->toBeNull();
     }
+});
+
+it('does not take a prose comment that merely starts like an entry for a commented variable', function (): void {
+    $path = envFileFixture($this->envDir, "# SAO_SYNC_ENABLED=false to keep the command manual-only.\n# SAO_SYNC_ENABLED=true\n# SAO_CRON=\"0 * * * *\"\n");
+
+    $file = EnvFile::read($path);
+
+    expect(array_map(static fn (EnvEntry $entry): string => $entry->name . '=' . $entry->raw, $file->entries()))->toBe(['SAO_SYNC_ENABLED=true', 'SAO_CRON="0 * * * *"'])
+        ->and($file->entry('SAO_SYNC_ENABLED')?->comment)->toBe('SAO_SYNC_ENABLED=false to keep the command manual-only.');
+});
+
+it('appends the text of an example value as it is written, keeping the interpolation', function (): void {
+    $path = envFileFixture($this->envDir, "APP_NAME=Laraplate\n");
+
+    EnvFile::read($path)->appendRaw('MAIL_FROM_NAME', '"${APP_NAME}"');
+
+    expect(file_get_contents($path))->toBe("APP_NAME=Laraplate\nMAIL_FROM_NAME=\"\${APP_NAME}\"\n")
+        ->and(Dotenv::parse((string) file_get_contents($path))['MAIL_FROM_NAME'])->toBe('Laraplate');
+});
+
+it('writes through a symlink to the file it points to and keeps the link', function (): void {
+    mkdir($this->envDir . '/shared');
+    mkdir($this->envDir . '/release');
+    file_put_contents($this->envDir . '/shared/.env', "A=1\n");
+    chmod($this->envDir . '/shared/.env', 0o600);
+    symlink($this->envDir . '/shared/.env', $this->envDir . '/release/.env');
+
+    EnvFile::read($this->envDir . '/release/.env')->append('B', '2');
+
+    expect(is_link($this->envDir . '/release/.env'))->toBeTrue()
+        ->and(file_get_contents($this->envDir . '/shared/.env'))->toBe("A=1\nB=2\n");
+
+    unlink($this->envDir . '/release/.env');
+    unlink($this->envDir . '/shared/.env');
+    rmdir($this->envDir . '/shared');
+    rmdir($this->envDir . '/release');
+});
+
+it('keeps what the file gained on disk after it was read', function (): void {
+    $path = envFileFixture($this->envDir, "A=1\n");
+    $file = EnvFile::read($path);
+
+    file_put_contents($path, "A=1\nEDITED_ELSEWHERE=yes\n");
+    $file->append('B', '2');
+
+    expect(file_get_contents($path))->toBe("A=1\nEDITED_ELSEWHERE=yes\nB=2\n");
+});
+
+it('refuses a name another process defined after the file was read', function (): void {
+    $path = envFileFixture($this->envDir, "A=1\n");
+    $file = EnvFile::read($path);
+
+    file_put_contents($path, "A=1\nB=taken\n");
+
+    expect(fn () => $file->append('B', '2'))->toThrow(InvalidArgumentException::class);
+    expect(file_get_contents($path))->toBe("A=1\nB=taken\n");
+});
+
+it('never lets a failed write raise a PHP warning or leave a temporary file', function (): void {
+    if (function_exists('posix_geteuid') && posix_geteuid() === 0) {
+        $this->markTestSkipped('A superuser can write to a read-only directory.');
+    }
+
+    $path = envFileFixture($this->envDir, "A=1\n");
+    $file = EnvFile::read($path);
+    chmod($this->envDir, 0o500);
+
+    try {
+        $file->append('SECRET_KEY', 'top-secret-value');
+        $this->fail('The append should have failed.');
+    } catch (RuntimeException $exception) {
+        expect($exception)->not->toBeInstanceOf(ErrorException::class)
+            ->and($exception->getMessage())->not->toContain('top-secret-value');
+    } finally {
+        chmod($this->envDir, 0o700);
+    }
+
+    expect(glob($this->envDir . '/.env.*'))->toBe([]);
 });

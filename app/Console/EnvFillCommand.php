@@ -12,6 +12,7 @@ use function Laravel\Prompts\text;
 use InvalidArgumentException;
 use Modules\Core\Contracts\RefreshesConfigCache;
 use Modules\Core\Overrides\Command;
+use Modules\Core\Support\Env\EnvEntry;
 use Modules\Core\Support\Env\EnvFile;
 use Modules\Core\Support\Env\EnvValue;
 use Override;
@@ -55,8 +56,8 @@ final class EnvFillCommand extends Command
 
         $this->components->info(count($missing) . ' ' . (count($missing) === 1 ? 'variable' : 'variables') . ' missing from ' . $target . '.');
 
-        if (! $this->input->isInteractive()) {
-            $this->components->error('Run the command interactively: every variable needs an answer.');
+        if (! $this->canAsk()) {
+            $this->components->error('Run the command interactively: every variable needs an answer, and there is no terminal to ask on (use ssh -t, or run it in a terminal).');
 
             return BaseCommand::FAILURE;
         }
@@ -89,7 +90,7 @@ final class EnvFillCommand extends Command
             }
 
             try {
-                $env->append($name, $this->askValue($name, $example));
+                $this->writeAnswer($env, $example, $name);
             } catch (InvalidArgumentException|RuntimeException $exception) {
                 $this->components->error($exception->getMessage());
                 $status = BaseCommand::FAILURE;
@@ -123,16 +124,40 @@ final class EnvFillCommand extends Command
         return app()->isProduction();
     }
 
-    private function askValue(string $name, EnvFile $example): string
+    /**
+     * Whether a prompt can be answered: the way Laravel decides to ask (a terminal on standard input, or a test), not
+     * only `--no-interaction`, because without a terminal every prompt would answer its default and write nothing.
+     */
+    private function canAsk(): bool
+    {
+        return $this->input->isInteractive() && (app()->runningUnitTests() || (defined('STDIN') && stream_isatty(STDIN)));
+    }
+
+    /**
+     * Asks the value of `$name` and appends it. An answer equal to the default offered, the value of the example
+     * line, writes the example's own text, so a quoted value or a `${VARIABLE}` reference stays what the example says.
+     */
+    private function writeAnswer(EnvFile $env, EnvFile $example, string $name): void
     {
         $entry = $example->entry($name);
-        $hint = $entry->comment ?? '';
+        $hint = $entry?->comment ?? '';
 
         if (EnvValue::isSecretName($name)) {
-            return password(label: $name, hint: $hint);
+            $env->append($name, password(label: $name, hint: $hint));
+
+            return;
         }
 
-        return text(label: $name, default: $entry->value ?? '', hint: $hint);
+        $default = $entry?->value ?? '';
+        $answer = text(label: $name, default: $default, hint: $hint);
+
+        if ($entry instanceof EnvEntry && $answer === $default) {
+            $env->appendRaw($name, $entry->raw);
+
+            return;
+        }
+
+        $env->append($name, $answer);
     }
 
     /**

@@ -244,3 +244,29 @@ it('exits 1 and writes nothing with --no-interaction', function (): void {
 
     expect(file_get_contents($options['--file']))->toBe("A=1\n");
 });
+
+it('writes the example text itself when the offered default is accepted, so an interpolation survives', function (): void {
+    $options = envFillFixture($this->envDir, "APP_NAME=Laraplate\n", "APP_NAME=Laraplate\n# MAIL_FROM_NAME=\"\${APP_NAME}\"\n");
+
+    $this->artisan('env:fill', $options)
+        ->expectsQuestion('Variable to set', 'MAIL_FROM_NAME')
+        ->expectsQuestion('MAIL_FROM_NAME', '${APP_NAME}')
+        ->assertExitCode(BaseCommand::SUCCESS);
+
+    expect(file_get_contents($options['--file']))->toBe("APP_NAME=Laraplate\nMAIL_FROM_NAME=\"\${APP_NAME}\"\n");
+});
+
+it('exits 1 and writes nothing when there is no terminal to ask on', function (): void {
+    if (defined('STDIN') && stream_isatty(STDIN)) {
+        $this->markTestSkipped('This run has a terminal.');
+    }
+
+    app()->detectEnvironment(static fn (): string => 'local');
+    $options = envFillFixture($this->envDir, "A=1\n", "A=1\nB=2\n");
+
+    $this->artisan('env:fill', $options)
+        ->expectsOutputToContain('no terminal')
+        ->assertExitCode(BaseCommand::FAILURE);
+
+    expect(file_get_contents($options['--file']))->toBe("A=1\n");
+});
