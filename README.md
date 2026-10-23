@@ -66,6 +66,18 @@ Then, you can install the module by running the following command:
 php artisan module:install Core
 ```
 
+## Keeping the `.env` aligned with `.env.example`
+
+A `.env` starts from `.env.example`. When an update adds variables to the example, the `.env` files already deployed do not get them. Run, after every update and on the production `.env`:
+
+```bash
+php artisan env:fill
+```
+
+It lists the variables of `.env.example` that the `.env` does not define (a commented line counts as not defined, an empty `NAME=` as defined), autocompletes their names, asks the value of the one you pick (the example value is the default, the comments above it are the hint, secret names such as `*_KEY`, `*_SECRET`, `*_PASSWORD`, `*_TOKEN` are asked with a masked prompt) and appends it to the file at once. An empty name ends the loop. If anything was written to the application's own `.env`, it then offers to run `config:clear` and `config:cache`; do not leave a cached configuration on a machine that runs the test suite.
+
+`--file=` and `--example=` point it at another pair of files, for example a copy of the production `.env`; the cache question is then not asked. Without a terminal (`--no-interaction`) it only reports how many variables are missing and exits with `1`.
+
 ## Configuration
 
 ```env
