@@ -6,6 +6,7 @@ namespace Modules\Core\Models\Concerns;
 
 use function property_exists;
 
+use Closure;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 // use Thiagoprz\CompositeKey\HasCompositeKey;
@@ -116,6 +117,31 @@ trait HasVersions
     public static function enableVersioning(): void
     {
         static::$versioning = true;
+    }
+
+    /**
+     * Saves the model, inside the revision scope of its root when the save writes more than the root's own row: a
+     * versioned root that owns translations or registers relations opens its scope before its SQL, so the root, its
+     * pending translations and their history are one revision committed together (D28, D34). Any other save, and a
+     * save with nothing to write, runs as Eloquent's.
+     *
+     * @param  array<string, mixed>  $options
+     */
+    public function save(array $options = []): bool
+    {
+        if (! $this->opensRevisionScopeOnSave()) {
+            return parent::save($options);
+        }
+
+        $manager = app(VersionSetManagerInterface::class);
+
+        // Inside an open scope the save joins it as it is (a revert, an explicit revision): options of its own
+        // would be refused as a different operation.
+        return (bool) $manager->run(
+            VersionSetRoot::forModel($this),
+            fn (): bool => parent::save($options),
+            $manager->current() === null ? new VersionSetOptions(actor: $this->getVersionUserId()) : null,
+        );
     }
 
     /**
@@ -412,6 +438,18 @@ trait HasVersions
         $user_id = $this->getAttribute($user_key);
 
         return is_numeric($user_id) ? (int) $user_id : null;
+    }
+
+    /**
+     * Groups several writes of this root in one revision: the importers, a loop over locales (D28).
+     */
+    public function withinRevision(Closure $operation, ?string $reason = null): mixed
+    {
+        return app(VersionSetManagerInterface::class)->run(
+            VersionSetRoot::forModel($this),
+            $operation,
+            new VersionSetOptions(reason: $reason, actor: $this->getVersionUserId()),
+        );
     }
 
     public function getVersionStrategy(): VersionStrategy|false
@@ -737,6 +775,28 @@ trait HasVersions
             && in_array($deleted_at_column, $keys, true)
             && $this->getRawOriginal($deleted_at_column) !== null
             && $this->getAttributes()[$deleted_at_column] === null;
+    }
+
+    /**
+     * Whether a save of this model opens its revision scope: a root whose history is on, that owns translations or
+     * registers relations, with something to write (D34). The others keep Eloquent's save and no extra transaction.
+     */
+    private function opensRevisionScopeOnSave(): bool
+    {
+        if (! static::$versioning || $this->getVersionStrategy() === false) {
+            return false;
+        }
+
+        $owns_parts = method_exists($this, 'translations')
+            || (method_exists($this, 'hasRegisteredRelations') && $this->hasRegisteredRelations());
+
+        if (! $owns_parts) {
+            return false;
+        }
+
+        return ! $this->exists
+            || $this->isDirty()
+            || (property_exists($this, 'pending_translations') && $this->pending_translations !== []);
     }
 
     private function getVersionDeletedAtColumn(): ?string

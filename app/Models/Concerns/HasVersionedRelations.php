@@ -74,6 +74,14 @@ trait HasVersionedRelations
      * The current aggregate revision: the latest version set that touched this root. Callers pass it
      * back as the expected revision on a restore, so a concurrent change is rejected instead of clobbered.
      */
+    /**
+     * Whether this root registers versioned relations, whose changes its save must group with its own (D34).
+     */
+    public function hasRegisteredRelations(): bool
+    {
+        return $this->versionedRelations() !== [];
+    }
+
     public function currentRevision(): ?int
     {
         $max = $this->versions()->max('version_set_id');
