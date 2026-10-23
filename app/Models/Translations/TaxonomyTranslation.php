@@ -6,6 +6,7 @@ namespace Modules\Core\Models\Translations;
 
 use Modules\Core\Enums\CoreTables;
 use Modules\Core\Models\Concerns\HasSlug;
+use Modules\Core\Models\Concerns\RecordsChangesOnOwner;
 use Modules\Core\Models\Concerns\TouchesOwnerOnChange;
 use Modules\Core\Overrides\Model;
 use Modules\Core\Services\Translation\Definitions\ITranslated;
@@ -15,6 +16,7 @@ use Override;
 final class TaxonomyTranslation extends Model implements ITranslated
 {
     use HasSlug;
+    use RecordsChangesOnOwner;
     use TouchesOwnerOnChange;
 
     /**

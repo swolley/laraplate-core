@@ -682,7 +682,9 @@ trait HasTranslations
         $translation = $query->where('locale', $locale)->first();
 
         if (! $translation instanceof Model) {
-            $this->translations()->create(array_merge($fields, ['locale' => $locale]));
+            $translation = $this->translations()->make(array_merge($fields, ['locale' => $locale]));
+            $this->giveOwnerTo($translation);
+            $translation->save();
 
             return;
         }
@@ -691,7 +693,19 @@ trait HasTranslations
             $translation->reviveInMemory();
         }
 
+        $this->giveOwnerTo($translation);
         $translation->fill($fields)->save();
+    }
+
+    /**
+     * Hands the translation this instance as its owner, so what the translation records on its owner (its history
+     * rows, D28) reaches the record being written, not a copy reloaded from the database nor its abstract base.
+     */
+    private function giveOwnerTo(Model $translation): void
+    {
+        if (method_exists($translation, 'recordOnHistoryOf')) {
+            $translation->recordOnHistoryOf($this);
+        }
     }
 
     /**
