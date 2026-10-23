@@ -15,7 +15,7 @@ it('seeds the four vector settings as command-managed', function (): void {
 
     expect($settings['search.vector.dimensions']->value)->toBe(384)
         ->and($settings['search.vector.similarity']->value)->toBe('cosine')
-        ->and($settings['search.vector.model']->value)->toBe('sentence_transformers:intfloat/multilingual-e5-small')
+        ->and($settings['search.vector.model']->value)->toBe('openai_compatible:intfloat/multilingual-e5-small')
         ->and($settings['search.vector.suspended_reason']->value)->toBeNull()
         ->and($settings['search.vector.suspended_reason']->type->value)->toBe('string');
 
